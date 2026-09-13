@@ -25,7 +25,7 @@ external nice-to-have:
 - **Backend API** — a Go service. Owns account/auth, budget cycle state,
   expense persistence, and (for users on the app's own AI access) the
   proxy to the AI provider.
-- **Database** — Postgres. The system of record for accounts, budget
+- **Database** — MySQL. The system of record for accounts, budget
   cycles, and expenses.
 - **AI provider (Claude API)** — generates the monthly spending analysis
   and the cycle comparison (PRD 5.6, 5.7) — two distinct features, each
@@ -36,6 +36,28 @@ external nice-to-have:
   one piece of the system Nokori doesn't operate itself, but it's still
   a dependency the design has to account for deliberately — prompt/response shape,
   failure handling, latency — not just "call an API and hope."
+
+### Tech stack
+
+- **Backend**: Go, Echo (`labstack/echo`), GORM as the query layer,
+  MySQL as the engine, go-migrate for versioned schema migrations —
+  kept separate from GORM's `AutoMigrate`, explicit up/down SQL files
+  instead. Scaffolded via CodeSeed (Sabir's own project generator):
+  controller/interactor/repository layers, mocked interfaces via
+  `go:generate mockgen`, structured logging via zap, env-based config
+  that fails loud on anything missing.
+- **API documentation**: OpenAPI, generated from handler annotations via
+  swaggo (`swaggo/swag` + `swaggo/echo-swagger`) — spec and a browsable
+  UI live next to the handler code rather than as a separately
+  maintained doc.
+- **Diagrams**: Mermaid, embedded directly in markdown — consistent with
+  how PRD/DDD/decisions.md are already written, and with how CodeSeed
+  documents its own command flows.
+- **Frontend**: Flutter, iOS only (PRD platform).
+- **Hosting**: Railway for the backend (MVP stage — section 5 covers the
+  production trajectory beyond it). Frontend: no CI yet — built and
+  installed locally via Xcode during active development (see
+  decisions.md; a real build pipeline is deferred, not decided against).
 
 ## 2. Why a backend is required
 
@@ -122,6 +144,20 @@ expenses just sit where they always were, fully queryable, indefinitely.
 The backend's job is serving that list back — paginated per cycle — with
 the exact same code path for a live cycle and a cycle from six months
 ago, not two different ones.
+
+### 3.7 Shared read-only view
+
+A user invites another existing account by some identifier (exact
+mechanism — email, username, code — left to schema/API design); the
+backend records a one-directional grant from the inviter to the invited
+viewer. On request, the backend checks that grant before returning
+anything, then serves only the inviter's current live-meter figures
+(PRD 5.8) — not their expense history, not their settings, not their
+salary/basic-needs inputs. The viewer's client can read this the same
+way it reads its own account's meter, just against a different
+account's data, gated entirely by the grant's existence. Revoking a
+grant is a delete of that record — no cascading cleanup needed, since
+nothing else was ever derived from it.
 
 ## 4. Client/backend boundary — what stays on-device
 

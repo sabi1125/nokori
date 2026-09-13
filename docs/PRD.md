@@ -30,6 +30,11 @@ The primary user for v1 is the developer themself — this is a
 dogfooding-first product. The design should hold up for a single, real,
 daily user before any thought is given to a wider audience.
 
+The one exception is the shared read-only view (5.8): it's built as part
+of MVP scope, but there's no specific second person lined up to use it
+yet. It ships code-complete against its spec, not proven through actual
+daily two-person use the way the rest of MVP is (see 7).
+
 ## 4. Core value proposition
 
 - A budget cycle anchored to *your* salary date, not the calendar month —
@@ -170,6 +175,24 @@ reflection; this puts the current cycle up against the previous one.
 - Users who supply their own AI provider key are not limited by the app
   and are billed directly by their provider, same as 5.6.
 
+### 5.8 Shared read-only view
+
+A user can invite another existing Nokori account to view their current
+cycle, read-only.
+
+- Visible to the invited viewer: the live meter (remaining budget,
+  pacing) only — not itemized expense history, not account settings,
+  not the salary/basic-needs figures behind the budget. (This is a
+  starting default, not researched against what's actually useful once
+  there's a real second user to ask — worth revisiting then.)
+- One-directional per invite: inviting someone to view your cycle
+  doesn't grant you the reverse. Mutual visibility is just two separate
+  invites.
+- Either side can revoke the connection at any time.
+- The viewer has no write access whatsoever — can't log an expense on
+  the other person's behalf, edit anything, or get notified of their
+  activity. Pure read access to the meter, nothing else.
+
 ## 6. Explicit non-goals for v1
 
 To keep the MVP shippable, the following are deliberately out of scope
@@ -182,7 +205,10 @@ and deferred to later phases:
   a registered business, this stays out of scope indefinitely rather
   than "coming eventually."
 - Multi-currency support.
-- Shared or family/household budgets.
+- Full shared/family budgets — joint editing, a combined pooled budget,
+  anything beyond a one-directional read-only view. (The read-only view
+  itself is in MVP scope — see 5.8. This non-goal is about anything past
+  that.)
 - Android or any non-iOS platform.
 - Per-item price history / barcode-based product tracking.
 - Push notifications / proactive nudges (may follow shortly after MVP,
@@ -202,6 +228,11 @@ cycle, exclusively use Nokori (no spreadsheet, no other app) to:
 5. Use the cycle comparison at least once mid-cycle and get a comparison
    against last cycle that's actually worth checking again.
 
+The shared read-only view (5.8) is a deliberate exception to the above:
+"done" for it means it works correctly against its spec (invite, view,
+revoke) — there's no second real person to validate it through actual
+daily use yet, unlike everything else on this list.
+
 ## 8. Future direction (post-MVP, not committed)
 
 - Production-grade backend infrastructure (this is being treated as a
@@ -209,6 +240,7 @@ cycle, exclusively use Nokori (no spreadsheet, no other app) to:
   the intended trajectory).
 - Per-item cost-per-use / price-history tracking for recurring
   purchases.
-- Shared budgets for two people.
+- Richer shared budgets — mutual/joint visibility, combined budgets —
+  beyond the one-directional read-only view already in MVP (5.8).
 - Richer, more proactive AI behavior (mid-cycle warnings, not just
   end-of-cycle summaries).

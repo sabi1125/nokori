@@ -28,6 +28,12 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-09-14 | [Overspend display](#overspend) | Meter can go negative | Decided |
 | 2026-09-14 | [Non-positive suggested budget](#non-positive) | Show it as-is, with a caution | Decided |
 | 2026-09-14 | [AI cycle comparison](#comparison) | Separate feature from the monthly analysis: on-demand, own hosted-key cap, always vs. previous cycle at the same elapsed point | Decided |
+| 2026-09-14 | [Database engine](#database) | MySQL | Decided (corrects an earlier mischaracterization — see entry) |
+| 2026-09-14 | [Backend framework](#framework) | Echo | Decided |
+| 2026-09-14 | [API documentation](#api-docs) | OpenAPI via swaggo + echo-swagger | Decided |
+| 2026-09-14 | [Diagram tooling](#diagrams) | Mermaid | Decided |
+| 2026-09-14 | [Shared read-only view](#sharing) | Part of MVP: one-directional, meter-only, revocable — no second user to validate against yet | Decided |
+| 2026-09-14 | [Frontend build/distribution](#frontend-build) | Build and install locally via Xcode for now; CI deferred | Decided |
 
 ---
 
@@ -364,3 +370,225 @@ feature with a different job: the monthly analysis is a reflective,
 once-a-cycle read; the comparison is a check-in tool meant to be used
 while the cycle is still unfolding. Giving it the same constraints as
 the monthly analysis would have quietly made it useless for that job.
+
+---
+
+<a id="database"></a>
+## 2026-09-14 — Database engine: MySQL (correcting an earlier mischaracterization)
+
+**Status:** Decided.
+
+### Context
+
+The DDD had said "Postgres" since before this decisions log existed —
+inherited from an earlier session's recap file and written into the DDD
+as if settled. It was never actually a decision Sabir made and confirmed
+in this project; it got carried forward and treated as locked purely
+because it was already written down. When backend stack questions came
+up for real, it turned out Sabir's own project scaffold (CodeSeed)
+defaults every Go project to MySQL — a direct conflict with what the DDD
+claimed, and the prompt to actually settle this properly instead of
+patching around it.
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Keep Postgres, patch CodeSeed's generated `database.go` to use `gorm.io/driver/postgres` instead of MySQL | Matches what the DDD happened to already say. Small mechanical patch (different import, different DSN format) — not a structural problem. | Solves for a decision that was never actually made deliberately — matching a stale doc for its own sake, not for a reason. |
+| **B. MySQL, matching CodeSeed's default as-is** ✅ chosen | No patching needed after every `codeseed init`. Matches the database Sabir already has real, repeated experience with across his other projects (same tool, same engine, same muscle memory). Nothing about Nokori's actual data (accounts, cycles, expenses) needs a Postgres-specific feature. | Diverges from what earlier planning material said — hence this entry, to make the correction explicit rather than silent. |
+
+### Decision
+
+Option B. The DDD's "Database" line is corrected to MySQL.
+
+### Rationale
+
+There was no real technical case for Postgres here — it was inertia from
+a document written before this decisions log existed, not a considered
+choice. Once actually examined, matching Sabir's own tooling and
+experience is the more defensible call, and nothing about this project's
+data model needs anything MySQL doesn't already provide.
+
+---
+
+<a id="framework"></a>
+## 2026-09-14 — Backend framework: Echo
+
+**Status:** Decided.
+
+### Context
+
+Gin was floated as worth considering. CodeSeed's golang templates
+(`router.go.tmpl`, `main.go.tmpl`) hardcode Echo (`labstack/echo`),
+though — this is less a fork between equally-available options and more
+"does the existing tool's default get used or fought."
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Echo, matching CodeSeed's default** ✅ chosen | Zero setup cost — comes free on every `codeseed init` and every `codeseed create`. Echo and Gin are close enough in capability and performance that there's no real technical reason to pay a switching cost here. | None specific to this project. |
+| B. Gin | Also a mature, well-supported Echo alternative, if there were ever a concrete reason to prefer it. | Would mean forking CodeSeed's templates or manually rewriting the generated router/main files after every scaffold command — ongoing friction for no identified benefit. |
+
+### Decision
+
+Option A.
+
+### Rationale
+
+There's no concrete requirement pulling toward Gin specifically — this
+is a case where using the tool's default beats introducing friction
+against it for a preference with no material backing.
+
+---
+
+<a id="api-docs"></a>
+## 2026-09-14 — API documentation: OpenAPI via swaggo + echo-swagger
+
+**Status:** Decided.
+
+### Context
+
+The backend needs some form of API documentation as it's built —
+question was format and tooling.
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. OpenAPI, generated from handler annotations via swaggo (`swaggo/swag` + `swaggo/echo-swagger`)** ✅ chosen | Spec lives next to the handler code as comments, so it's structurally harder for it to silently drift out of sync. Produces a browsable Swagger UI — useful for exercising the API by hand before the Flutter client exists to do it. Industry-standard format if anything ever needs to consume the spec later (client codegen, external tooling). | One more dependency; annotation comments can get verbose for complex request/response shapes. |
+| B. Hand-maintained markdown docs | Consistent with the existing PRD/DDD/decisions.md style; no new dependency. | Has to be manually kept in sync with every route change, with nothing structurally enforcing that — the exact kind of drift the other option avoids by construction. |
+
+### Decision
+
+Option A.
+
+### Rationale
+
+Given the backend is being built with real engineering rigor as a
+stated goal (see PRD's target-user framing and the DDD's "MVP, not a
+POC" stance), documentation that's structurally tied to the code is
+worth the one extra dependency over documentation that relies on
+remembering to update it.
+
+---
+
+<a id="diagrams"></a>
+## 2026-09-14 — Diagram tooling: Mermaid
+
+**Status:** Decided.
+
+### Context
+
+Diagrams will be needed for schema (ER diagrams), system shape, and flow
+documentation as the build progresses — question was Mermaid vs.
+PlantUML.
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Mermaid** ✅ chosen | Renders natively in GitHub, GitLab, and Claude Code artifacts straight from a fenced code block in the same markdown files already being written — no separate render step or hosting. Already the tool Sabir uses for CodeSeed's own command-flow docs, so it's an existing habit, not a new one. Covers everything needed here: ER diagrams, flowcharts, sequence diagrams. | Less mature for strict UML fidelity than PlantUML in some diagram types. |
+| B. PlantUML | More mature/precise UML semantics for complex diagrams. | Needs a separate renderer (local Java tool or a public server) to actually produce an image — friction this project's all-markdown doc workflow doesn't otherwise have anywhere. |
+
+### Decision
+
+Option A.
+
+### Rationale
+
+Consistency with tooling already in use, plus zero-friction rendering
+directly inside the markdown files this project already lives in, beats
+PlantUML's extra UML precision for what these diagrams actually need to
+do here.
+
+---
+
+<a id="sharing"></a>
+## 2026-09-14 — Shared read-only view: part of MVP, one-directional, meter-only
+
+**Status:** Decided.
+
+### Context
+
+"Shared budgets" had been sitting as a flat non-goal since early
+planning. Revisited: Sabir wants something between nothing and full
+shared budgets — a read-only view of another Nokori user's spending.
+Three things needed pinning down: whether a specific second person
+exists to build this for, whether it ships in MVP or after, and (not
+originally asked, but necessary to actually spec it) what exactly the
+viewer gets to see.
+
+### Whether a specific second user exists
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Yes, a specific real person would use it soon | Real usage to validate against, same as everything else in MVP. | N/A — not the case here. |
+| **B. No specific second user yet — forward-looking** ✅ chosen | Doesn't block the feature on finding someone to test with. | This feature can't be validated by real daily use the way the rest of MVP is (PRD 3, PRD 7) — it ships correct-to-spec, not proven-through-use. Worth being explicit about that gap rather than pretending it's tested the same way. |
+
+### MVP timing
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Part of MVP** ✅ chosen | Gets the invite/grant mechanism built now, while the account/auth model is still being shaped — likely cheaper than retrofitting it later. | Adds real scope (an invite/grant flow, cross-account read access) to a v1 that otherwise has no other user in the picture at all. |
+| B. Right after MVP | Keeps v1 scope matching what actually gets validated (solo use only). | Retrofits a cross-account concept onto a data model that was designed single-user-only, potentially more expensive later than building it in from the start. |
+
+### What's visible to the viewer (not originally asked — a default proposed here)
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Live meter only (remaining budget, pacing) — no itemized history, no settings** ✅ chosen (starting default) | Conservative by default, consistent with the app's existing privacy stance (DDD 4) of not exposing more than necessary. Simplest to build — one read endpoint, no history pagination or filtering logic for a second account. | May turn out to be too little to actually be useful once there's a real second user — untested guess, flagged as such rather than presented as researched. |
+| B. Live meter + full expense history | More genuinely useful for a partner actually trying to understand spending together. | More surface area (itemized data, categories) exposed to a second account with no real user to weigh that trade-off against yet. |
+
+### Decision
+
+Part of MVP (PRD 5.8). One-directional per invite (inviting someone to
+view you doesn't grant the reverse — mutual visibility is just two
+invites). Revocable at any time. Read access to the live meter only, no
+write access of any kind. The "meter only, not full history" scope is a
+starting default, explicitly flagged as worth revisiting once there's an
+actual second person to ask.
+
+### Rationale
+
+Building the grant mechanism now, while the account model is still
+young, is likely cheaper than bolting cross-account access onto a
+single-user-shaped schema later — even without a concrete second user
+yet. Keeping what's visible minimal by default matches the privacy
+posture already established elsewhere in this project (DDD 4) and gives
+the cheapest possible version to actually build and revise later.
+
+---
+
+<a id="frontend-build"></a>
+## 2026-09-14 — Frontend build/distribution: local Xcode builds for now, CI deferred
+
+**Status:** Decided.
+
+### Context
+
+Railway (the backend host) doesn't build or distribute iOS apps — that
+requires Xcode, which is macOS-only, and a completely different pipeline
+from a backend deploy. Needed to decide how builds get onto a phone
+during active development.
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Build and install locally via Xcode** ✅ chosen | Zero new tooling — Sabir has a Mac. Fastest possible loop during active development, where rebuilds happen constantly anyway. | Free-Apple-ID signing expires every 7 days, forcing a rebuild/reinstall on that cadence even with no code changes — a real but minor annoyance once development slows down. |
+| B. Set up a CI pipeline now (Codemagic / Xcode Cloud / GitHub Actions + Fastlane) | Automated builds from day one; no manual rebuild-on-expiry cycle. | Real upfront setup cost for a problem that isn't actually blocking anything yet — premature given the app doesn't exist as code yet either. |
+
+### Decision
+
+Option A for now. Revisit a real CI pipeline once local builds actually
+become the bottleneck (e.g. once daily use matters more than active
+development, and the 7-day expiry becomes a real annoyance rather than a
+non-issue).
+
+### Rationale
+
+There's no reason to pay a CI setup cost before it's actually needed —
+same reasoning already used for the Apple Developer Program membership
+in the auth decision. Local builds are free and immediate given Sabir
+already has a Mac.
