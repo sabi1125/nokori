@@ -30,7 +30,8 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-09-14 | [AI cycle comparison](#comparison) | Separate feature from the monthly analysis: on-demand, own hosted-key cap, always vs. previous cycle at the same elapsed point | Decided |
 | 2026-09-14 | [Database engine](#database) | MySQL | Decided (corrects an earlier mischaracterization — see entry) |
 | 2026-09-14 | [Backend framework](#framework) | Echo | Decided |
-| 2026-09-14 | [API documentation](#api-docs) | OpenAPI via swaggo + echo-swagger | Decided |
+| 2026-09-14 | [API documentation](#api-docs) | OpenAPI via swaggo + echo-swagger | Superseded — see below |
+| 2026-09-14 | [API documentation: spec-first](#api-docs-final) | Hand-authored OpenAPI spec in `open-api/`, viewed via Scalar — written before backend implementation, not generated from it | Decided |
 | 2026-09-14 | [Diagram tooling](#diagrams) | Mermaid | Decided |
 | 2026-09-14 | [Shared read-only view](#sharing) | Part of MVP: one-directional, meter-only, revocable — no second user to validate against yet | Decided |
 | 2026-09-14 | [Frontend build/distribution](#frontend-build) | Build and install locally via Xcode for now; CI deferred | Decided |
@@ -471,6 +472,59 @@ stated goal (see PRD's target-user framing and the DDD's "MVP, not a
 POC" stance), documentation that's structurally tied to the code is
 worth the one extra dependency over documentation that relies on
 remembering to update it.
+
+### Superseded
+
+This assumed a **code-first** workflow — write handlers, annotate them,
+generate the spec from what already exists. Sabir wants the opposite:
+design the API contract before the backend is implemented, the same way
+this project has designed everything else (PRD → DDD → decisions before
+code). Swaggo can't do that — it only generates a spec *from* existing
+code, it has nothing to generate from before that code exists. See
+[API documentation: spec-first](#api-docs-final) below, which replaces
+this entry's approach entirely.
+
+---
+
+<a id="api-docs-final"></a>
+## 2026-09-14 — API documentation, superseding the above: spec-first, hand-authored, no backend dependency
+
+**Status:** Decided. Supersedes [the swaggo/echo-swagger entry](#api-docs)
+above.
+
+### Context
+
+Backend scaffolding was started (via CodeSeed) on the assumption that
+swaggo needed real annotated handlers to generate a spec from. Sabir
+caught this: the whole point is to design the API contract *before*
+writing the implementation, matching how this project has worked from
+the start — PRD, then DDD, then decisions, before any code. A tool that
+only generates docs from code that already exists is backwards for that
+workflow.
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Code-first via swaggo (previous entry) | Spec structurally can't drift from the implementation, since it's generated from it. | Requires the implementation to exist first — exactly backwards from a design-first process. Was the reason backend scaffolding got started before there was anything to actually implement. |
+| **B. Hand-author the OpenAPI spec in `open-api/`, viewed via Scalar, before backend code exists** ✅ chosen | The contract gets designed and reviewed on its own terms, the same way PRD/DDD/decisions.md already work — implementation then builds *to* the spec instead of the spec being an afterthought describing whatever got built. No dependency on backend code existing at all; `open-api/` is fully independent. | Nothing structurally prevents the implementation from drifting away from the hand-written spec later — that has to be enforced by discipline (or, later, a contract test) rather than by the spec being generated from the code. |
+
+### Decision
+
+Option B. `open-api/` holds a hand-authored `openapi.yaml`, rendered via
+Scalar (a static page pulling in Scalar's API Reference component),
+served by its own Dockerfile — no dependency on `backend/` existing.
+Swaggo/echo-swagger are dropped entirely, not just deferred.
+
+### Rationale
+
+This project's whole working method has been design-first — nothing
+gets built before the reasoning and shape are written down and reviewed.
+Code-first API docs quietly inverts that just for this one piece. The
+drift risk in option B is real, but it's the same kind of discipline
+already required to keep `docs/decisions.md` itself honest — not a new
+problem, and one worth accepting to keep the API contract a real design
+step instead of a byproduct.
 
 ---
 

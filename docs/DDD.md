@@ -46,10 +46,10 @@ external nice-to-have:
   controller/interactor/repository layers, mocked interfaces via
   `go:generate mockgen`, structured logging via zap, env-based config
   that fails loud on anything missing.
-- **API documentation**: OpenAPI, generated from handler annotations via
-  swaggo (`swaggo/swag` + `swaggo/echo-swagger`) — spec and a browsable
-  UI live next to the handler code rather than as a separately
-  maintained doc.
+- **API documentation**: OpenAPI, hand-authored in `open-api/` and
+  viewed via Scalar — designed before the backend implements it, not
+  generated from code that already exists (see decisions.md). `open-api/`
+  has no dependency on `backend/`.
 - **Diagrams**: Mermaid, embedded directly in markdown — consistent with
   how PRD/DDD/decisions.md are already written, and with how CodeSeed
   documents its own command flows.

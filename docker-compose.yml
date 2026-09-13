@@ -1,0 +1,7 @@
+services:
+  open-api:
+    build: ./open-api
+    ports:
+      - "3000:80"
+    volumes:
+      - ./open-api/public:/usr/share/nginx/html:ro
