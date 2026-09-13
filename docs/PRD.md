@@ -1,4 +1,5 @@
 [toc]
+
 # Nokori (残り) — Product Requirements Document
 
 Status: Draft v0.1
@@ -31,32 +32,66 @@ daily user before any thought is given to a wider audience.
 
 ## 4. Core value proposition
 
-- A budget cycle anchored to *your* salary date, not the calendar month.
+- A budget cycle anchored to *your* salary date, not the calendar month —
+  and a budget that's grounded in your actual salary and fixed costs,
+  not a number typed in on a guess.
 - A live, visible "what's left" meter that moves every time you log a
   spend — the core emotional hook of the app.
 - Logging an expense should take one of three near-zero-effort paths:
   type it, photograph the receipt, or say it out loud.
 - Once a month, a reflective AI summary of spending behavior — not just a
   restated total, but a read on patterns.
+- On demand, an AI comparison of this cycle against the last one — a
+  live check-in, not just an end-of-cycle look back.
 
 ## 5. MVP scope
 
 ### 5.1 Account
 
-- Sign in with Apple (required — the only social login offered, which
-  keeps the app compliant without needing a second OAuth provider).
-- Email/password as a fallback sign-in method.
-- Basic account settings: change salary date, change budget amount,
+- Email/password, self-built — the only sign-in method. No Sign in with
+  Apple, no Google, no OAuth of any kind (see decisions.md: Apple only
+  requires Sign in with Apple when the app offers a third-party login as
+  an option, which this deliberately never does).
+- Basic account settings: change salary date, update salary and
+  basic-needs amounts (recomputes the suggested budget — see 5.2),
   delete account, manage AI key (below).
 
 ### 5.2 Budget cycle
 
-- User sets a recurring salary date (day of month) and a budget amount
-  for that cycle.
+- User sets a recurring salary date (day of month). On setup, and again
+  whenever it changes, they also enter their salary and their basic
+  needs for the cycle — a fixed, app-defined set of categories (rent,
+  electricity/water/gas, transportation, food) with a user-entered
+  amount each.
+- From salary and basic needs, the app computes a suggested cycle
+  budget with a fixed formula, adapted from the well-known 50/30/20
+  personal-budgeting rule: `salary − basic needs − (20% of salary set
+  aside as savings)` — the actual entered basic needs stand in for the
+  rule's assumed 50% "needs" bucket, and what's left after the 20%
+  savings cut becomes the budget (see decisions.md for the reasoning).
+  This is a deterministic calculation — no AI call is involved.
+- The user can edit the suggested number before it becomes the cycle's
+  real budget, matching the app's rule that nothing gets silently
+  applied from a computed guess (see 5.3). If the edit would eat into
+  the savings cut or fall short of the entered basic needs, the app
+  shows a caution before letting them confirm — a warning, not a block.
+- The suggested budget is only recomputed when salary or basic needs
+  actually change, not automatically every cycle.
+- If the computed suggestion is zero or negative (basic needs plus the
+  savings cut consume the entire salary or more), the app still shows
+  that number, with a caution — it's a real signal about the user's
+  situation, not something to hide or silently auto-correct. The user
+  can still confirm it or edit it.
 - The app computes the current cycle window (last salary date → next
-  salary date) and tracks total spend against the budget within it.
+  salary date) and tracks total spend against the (possibly
+  user-adjusted) budget within it.
+- Unspent budget does not carry over between cycles — each new cycle
+  starts from its own freshly computed (or manually set) budget, not the
+  previous cycle's leftover.
 - When a new cycle starts, the previous cycle is archived and a new one
-  begins automatically.
+  begins automatically, carrying forward the same salary/basic-needs
+  figures — and therefore the same suggested budget — unless the user
+  changes them.
 
 ### 5.3 Expense capture
 
@@ -74,13 +109,27 @@ In both the photo and voice paths, the user confirms/edits the
 extracted result before it's saved — the app should never silently log
 a guessed number.
 
+Categories split into two kinds: **basic-needs categories** (the same
+fixed list used in 5.2 — rent, electricity/water/gas, transportation,
+food) and **discretionary categories** (everything else). This isn't
+just labeling — see 5.4 for why it matters to the meter.
+
 ### 5.4 Live budget meter
 
 - Home screen shows remaining budget for the current cycle, updating
   immediately as expenses are logged.
-- Visual indication of pace (e.g. spending faster than the cycle
-  position would suggest) is in scope for v1 if time allows; not a
-  blocker for shipping.
+- Only discretionary-category expenses (5.3) count against the
+  remaining balance shown here. Basic-needs-category expenses are still
+  logged for the record, but don't move the meter, since that amount is
+  already subtracted upfront by the budget formula (5.2) — counting it
+  again here would double it.
+- If total discretionary spend exceeds the budget, the meter goes
+  negative rather than clamping at zero — an honest signal of
+  overspending, consistent with the pacing indicator below.
+- Visual indication of pace (e.g. spending faster, on track, or slower
+  than the cycle position would suggest) is a committed MVP
+  requirement, not a stretch goal — it's what makes the meter a
+  behavior-changing signal rather than just a running total.
 
 ### 5.5 Expense history
 
@@ -96,12 +145,42 @@ a guessed number.
 - Users who supply their own AI provider key are not limited by the
   app and are billed directly by their provider.
 
+### 5.7 AI cycle comparison
+
+A separate, more advanced feature from 5.6 — that's a single-cycle
+reflection; this puts the current cycle up against the previous one.
+
+- Can be requested at any time, including mid-cycle — not gated to
+  once-per-cycle like 5.6. The point is being able to check "how am I
+  doing vs. last cycle" while there's still time to act on it.
+- Always compares against the immediately previous cycle (no picker for
+  older cycles in v1).
+- A mid-cycle request compares spend-to-date this cycle against spend
+  *at the same point* in the previous cycle (e.g. day 9 of this cycle
+  vs. day 9 of last cycle) — never against the previous cycle's full
+  total, which would make the current cycle look artificially good
+  simply because it isn't over yet.
+- Output is both an AI-written comparison *and* the category-by-category
+  numbers it's based on, shown together — not narrative alone.
+- Users on the app's own AI access get a separate allowance from 5.6's
+  once-per-cycle cap, since this is a different feature with a different
+  usage pattern. Starting cap: up to 3 requests per cycle — a rough
+  starting point, not a researched number, worth revisiting once there's
+  real usage to look at.
+- Users who supply their own AI provider key are not limited by the app
+  and are billed directly by their provider, same as 5.6.
+
 ## 6. Explicit non-goals for v1
 
 To keep the MVP shippable, the following are deliberately out of scope
 and deferred to later phases:
 
-- Bank account linking / automatic transaction import.
+- Bank account linking / automatic transaction import — not really a
+  "defer to later" item like the rest of this list. The aggregators
+  that make this feasible (Plaid, etc.) require a business agreement;
+  personal/individual use isn't eligible. Barring the project becoming
+  a registered business, this stays out of scope indefinitely rather
+  than "coming eventually."
 - Multi-currency support.
 - Shared or family/household budgets.
 - Android or any non-iOS platform.
@@ -114,11 +193,14 @@ and deferred to later phases:
 The MVP is "done" when the developer can, for one full real salary
 cycle, exclusively use Nokori (no spreadsheet, no other app) to:
 
-1. Set up their salary date and budget.
+1. Set up their salary date, salary, and basic needs, and confirm the
+   resulting suggested budget.
 2. Log every real expense that cycle via text, photo, or voice.
 3. Watch the live meter accurately reflect what's left at any point.
 4. Get one AI analysis at the end of the cycle that says something
    genuinely useful about their spending.
+5. Use the cycle comparison at least once mid-cycle and get a comparison
+   against last cycle that's actually worth checking again.
 
 ## 8. Future direction (post-MVP, not committed)
 
