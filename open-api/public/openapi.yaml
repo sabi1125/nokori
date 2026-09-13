@@ -1,0 +1,35 @@
+openapi: 3.1.0
+info:
+  title: Nokori API
+  version: 0.1.0
+  description: >
+    Backend API for Nokori — a personal expense tracker anchored to
+    salary cycles, not the calendar month. This spec is hand-authored
+    and designed before the backend implements it (see
+    docs/decisions.md — "API documentation, spec-first"). Product scope
+    lives in docs/PRD.md, system shape in docs/DDD.md.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: >
+        Liveness check for the backend — no auth required. Returns 200
+        if the service is up and able to reach its dependencies.
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
