@@ -1,0 +1,21 @@
+name: Ticket
+description: Bug, feature, chore, or doc change — anything that needs tracking
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What's going on / what's the goal
+      description: >
+        For a bug: what happened, what you expected instead, and how to
+        reproduce it. For a feature or chore: what you want and why. If
+        this follows from a docs/decisions.md entry, link it instead of
+        re-explaining the reasoning here.
+    validations:
+      required: true
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+      description: What tells you this is actually finished.
+    validations:
+      required: false

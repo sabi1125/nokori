@@ -1,0 +1,46 @@
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Go ---
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# --- Flutter / Dart ---
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/build/
+
+# --- iOS / Xcode ---
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/*.xcuserstate
+**/xcuserdata/
+
+# --- macOS ---
+.DS_Store
+
+# --- Editors ---
+.vscode/
+.idea/
+
+# --- Claude Code: machine-local overrides only, not the shared config ---
+.claude/settings.local.json

@@ -34,6 +34,7 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-09-14 | [Diagram tooling](#diagrams) | Mermaid | Decided |
 | 2026-09-14 | [Shared read-only view](#sharing) | Part of MVP: one-directional, meter-only, revocable — no second user to validate against yet | Decided |
 | 2026-09-14 | [Frontend build/distribution](#frontend-build) | Build and install locally via Xcode for now; CI deferred | Decided |
+| 2026-09-14 | [Ticket tracking](#tickets) | GitHub Issues + GitHub Projects | Decided |
 
 ---
 
@@ -592,3 +593,37 @@ There's no reason to pay a CI setup cost before it's actually needed —
 same reasoning already used for the Apple Developer Program membership
 in the auth decision. Local builds are free and immediate given Sabir
 already has a Mac.
+
+---
+
+<a id="tickets"></a>
+## 2026-09-14 — Ticket tracking: GitHub Issues + GitHub Projects
+
+**Status:** Decided.
+
+### Context
+
+Two real options: Linear or GitHub Issues. Initial lean was GitHub,
+partly on the assumption that Linear requires payment — checked, and
+that's not quite right: Linear's free tier covers unlimited members, 2
+teams, and 250 non-archived issues, which a well-maintained solo backlog
+would likely stay under. So this wasn't actually a cost decision.
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Linear | Free tier is genuinely usable at this scale. Purpose-built ticket UX: cycles, triage, roadmap views, fast keyboard-driven entry. GitHub integration exists (issues can link to commits/PRs). | A separate tool and login from where the code actually lives. Its strongest features (cycles, async triage, roadmaps) are built for teams coordinating with each other — nothing to coordinate solo. |
+| **B. GitHub Issues + GitHub Projects** ✅ chosen | Co-located with the code — a commit or PR can reference and auto-close an issue directly ("Fixes #12"), one notification stream instead of two. GitHub Projects (free, built-in) gives a Kanban board on top of Issues without a second tool. Zero cost, no caps, ever. | Weaker ticket-specific UX than Linear (no native cycles/sprints, more manual labels/workflow setup). |
+
+### Decision
+
+Option B.
+
+### Rationale
+
+For a solo project where the code already lives on GitHub, keeping
+tickets in the same place beats a more polished but separate tool whose
+biggest advantages (team coordination features) don't apply yet. Not a
+permanent lock-in either way — Linear has GitHub-issue import tooling if
+this ever becomes a multi-person project later.
