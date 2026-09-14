@@ -5,3 +5,18 @@ services:
       - "3000:80"
     volumes:
       - ./open-api/public:/usr/share/nginx/html:ro
+# TODO: the credentials are subject to change
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: nokori
+      MYSQL_USER: nokori
+      MYSQL_PASSWORD: nokori123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
