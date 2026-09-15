@@ -58,6 +58,15 @@ same reasoning as not pre-creating empty nested `CLAUDE.md` files below.
   `frontend`, `ai`, `infra`, `open-api`).
 - **Every ticket gets at least one type label and one area label, and is
   assigned to `sabi1125` (Sabir) — no unlabeled or unassigned tickets.**
+- **Feature-sized work gets one parent ticket per PRD feature (labeled
+  `epic`, no type/area label needed on the parent itself), with the
+  actual backend/frontend implementation tickets attached as GitHub
+  native sub-issues** (`gh api repos/{owner}/{repo}/issues/{parent}/sub_issues -X POST -F sub_issue_id={child's numeric id}`
+  — note: `sub_issue_id` is the child issue's internal `id` field, not
+  its issue number). This is also the answer to "how do I find just the
+  parent tickets": GitHub has no built-in search qualifier for
+  sub-issues (`has:sub-issues` looks plausible but silently does
+  nothing) — filter with `label:epic` instead.
 - **Keep tickets short.** State the goal and the done-when condition
   plainly. Don't restate context that's already in `docs/` — link to the
   relevant `decisions.md` entry instead of re-explaining the reasoning
