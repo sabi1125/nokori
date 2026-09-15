@@ -17,6 +17,21 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      ENVIRONMENT: development
+      LOG_LEVEL: DEBUG
+      DB_USER: nokori
+      DB_PASSWORD: nokori123
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: nokori
+    depends_on:
+      - mysql
 
 volumes:
   mysql-data:
