@@ -33,9 +33,13 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-09-14 | [API documentation](#api-docs) | OpenAPI via swaggo + echo-swagger | Superseded — see below |
 | 2026-09-14 | [API documentation: spec-first](#api-docs-final) | Hand-authored OpenAPI spec in `open-api/`, viewed via Scalar — written before backend implementation, not generated from it | Decided |
 | 2026-09-14 | [Diagram tooling](#diagrams) | Mermaid | Decided |
-| 2026-09-14 | [Shared read-only view](#sharing) | Part of MVP: one-directional, meter-only, revocable — no second user to validate against yet | Decided |
+| 2026-09-14 | [Shared read-only view](#sharing) | Part of MVP: one-directional, meter-only, revocable — no second user to validate against yet | Superseded — see below |
 | 2026-09-14 | [Frontend build/distribution](#frontend-build) | Build and install locally via Xcode for now; CI deferred | Decided |
 | 2026-09-14 | [Ticket tracking](#tickets) | GitHub Issues + GitHub Projects | Decided |
+| 2026-09-16 | [Email verification](#email-verification) | One-time code, sent on first post-signup login attempt (not at signup), which is blocked until verified; delivered via Resend | Decided |
+| 2026-09-16 | [AI monthly analysis: add recommendations](#analysis-recommendations) | Pulled into MVP now — same AI call, same cap, richer output | Decided |
+| 2026-09-16 | [Shared read-only view: dropped from MVP](#sharing-dropped) | Cut entirely for now — supersedes the earlier "part of MVP" decision | Decided |
+| 2026-09-22 | [Basic needs: default set, user-editable](#basic-needs-variable) | Not fixed to 4 categories — ship with rent/utilities/transport/food pre-filled, user can add or remove | Decided (supersedes "fixed, app-defined" in the budget-formula entry) |
 
 ---
 
@@ -127,7 +131,9 @@ correct, and there's nothing to add later.
 <a id="budget-formula"></a>
 ## 2026-09-14 — Cycle budget: derive it from salary + basic needs via a fixed formula, not an AI call
 
-**Status:** Decided.
+**Status:** Decided. The formula itself stands — the "fixed app-defined
+list" of basic-needs categories mentioned in the Context below was later
+revised; see [Basic needs: default set, user-editable](#basic-needs-variable).
 
 ### Context
 
@@ -562,7 +568,8 @@ do here.
 <a id="sharing"></a>
 ## 2026-09-14 — Shared read-only view: part of MVP, one-directional, meter-only
 
-**Status:** Decided.
+**Status:** Superseded — see [Shared read-only view: dropped from MVP](#sharing-dropped)
+below, which replaces this entry's "part of MVP" call entirely.
 
 ### Context
 
@@ -681,3 +688,181 @@ tickets in the same place beats a more polished but separate tool whose
 biggest advantages (team coordination features) don't apply yet. Not a
 permanent lock-in either way — Linear has GitHub-issue import tooling if
 this ever becomes a multi-person project later.
+
+---
+
+<a id="email-verification"></a>
+## 2026-09-16 — Email verification: one-time code, triggered by first login, not signup
+
+**Status:** Decided. Not previously written down despite being treated
+as settled — recorded here now so it's actually checkable instead of
+just remembered.
+
+### Context
+
+Self-built email/password signup (see [Auth: no OAuth at all](#auth-final))
+has no built-in way to confirm the email address is real and belongs to
+the person signing up — unlike an OAuth provider, which vouches for the
+address itself. Two things needed pinning down: when the verification
+code gets sent, and what actually delivers the email.
+
+### When the code is sent
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Send immediately on signup, before the account is usable at all | Verifies ownership at the earliest possible point. | Forces a context-switch to email right in the middle of the signup form, before the person has any reason yet to trust the app enough to go check their inbox. |
+| **B. Don't send at signup; send it when the user attempts their first login, and block that login until it's entered** ✅ chosen | Signup itself stays a single, uninterrupted step. The code is generated exactly when it's actually needed — at the moment of real access — not stockpiled unused if someone signs up and doesn't come back right away. Still a hard gate: no real use of the app happens until the email is confirmed. | The account technically exists, unverified, between signup and that first login attempt — acceptable since nothing about it is usable in that window anyway. |
+| C. No verification at all | Simplest; nothing to build. | No way to confirm the email is real or reachable — relevant for the password-reset flow this project's own self-built auth already commits to owning (see [Auth: no OAuth at all](#auth-final)). |
+
+### Delivery provider
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Amazon SES | Very cheap past the free tier. | Free tier only applies inside AWS's own sandbox; leaving sandbox needs domain verification and a production-access request — real setup cost for a single-user MVP. |
+| **B. Resend** ✅ chosen | 3,000 emails/month free, no card required to start, simple API — more than enough at this project's current scale. | Another external dependency to keep an API key for, alongside the AI provider key. |
+| C. Log the code server-side only, no real provider yet | Zero setup, zero dependency. | Rejected — the point of this feature is that a real email actually gets confirmed; a logged-only code doesn't validate that the address is reachable. |
+
+### Decision
+
+Option B for timing, Option B for delivery: the first login attempt
+after signup triggers a one-time code sent via Resend to the address on
+file; that login does not complete until the code is entered correctly.
+Every login after the first proceeds normally, since the address is
+already confirmed.
+
+### Rationale
+
+Deferring the send to first login rather than signup keeps the signup
+form itself simple and matches how most new users actually behave
+anyway (sign up, then immediately try to log in) — the code lands right
+when it's needed instead of the moment the account existed. Resend's
+free tier removes any cost question at this project's current, single-
+user scale, the same reasoning already used to defer the Apple Developer
+Program and a CI pipeline until they were actually needed.
+
+---
+
+<a id="analysis-recommendations"></a>
+## 2026-09-16 — AI monthly analysis: add actionable recommendations, pulled forward from post-MVP
+
+**Status:** Decided.
+
+### Context
+
+PRD 5.6 was written as pure reflection — patterns and notable changes,
+explicitly "not compared to any external population," with anything more
+proactive (PRD 8: "richer, more proactive AI behavior") deliberately
+deferred past MVP, in the same spirit as the non-goals list in PRD 6.
+Revisited: the reason to defer was assumed to be added cost/complexity,
+but recommendations don't actually require a new AI call, a new cap, or
+new infrastructure — the monthly analysis already gathers the full
+cycle's data and makes one Claude call; recommendations are just a
+bigger ask within that same call.
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Keep 5.6 reflection-only; recommendations stay a post-MVP idea (PRD 8) | Matches the original MVP-scope split; less to design/verify before shipping. | Defers something that costs nothing extra to build, for reasons (cost/complexity) that turn out not to apply here. |
+| **B. Add recommendations to the same monthly analysis output now** ✅ chosen | No new AI call, no new hosted-key cap, no new quota question — same request, richer response. Turns the analysis from a mirror into something actually actionable, which is the whole reason a user would bother requesting it. | Recommendations carry more downside than a narrative observation if the AI misreads context (e.g. suggesting to cut a basic-needs expense that's already excluded from the meter) — needs the same "never silently apply" framing already used for budget edits and expense capture: shown as suggestions to consider, not actions taken. |
+
+### Decision
+
+Option B. PRD 5.6 updated: the monthly analysis output includes concrete
+recommendations alongside the narrative, presented as suggestions the
+user reviews — never auto-applied to the budget or settings. No change
+to the once-per-cycle hosted-key cap.
+
+### Rationale
+
+The original deferral assumed a cost that isn't real — this is the same
+call, same data, same cap, just a fuller prompt. The actual risk
+(bad advice) is handled the same way this project already handles every
+other AI/computed output: shown to the user to act on or ignore, never
+applied silently.
+
+---
+
+<a id="sharing-dropped"></a>
+## 2026-09-16 — Shared read-only view, superseding the above: dropped from MVP entirely
+
+**Status:** Decided. Supersedes [the earlier "part of MVP" entry](#sharing).
+
+### Context
+
+Working through the ER diagram (#7) surfaced how much real schema
+complexity the invite/grant mechanism adds — a grant table, revocation,
+and gating every read against it — for a feature the original entry
+already flagged as unvalidated: no specific second user exists to use it
+(PRD 3 already carried this as a standing exception to "everything in
+MVP gets validated through real daily use").
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Keep it in MVP, as originally decided | Grant mechanism gets built while the account model is still young — the original entry's whole argument. | Real schema/API surface for a feature nobody will actually use during MVP (no second person exists), on top of everything else already in scope. |
+| **B. Drop it from MVP entirely; revisit post-MVP if a real second user shows up** ✅ chosen | Removes a grant table, a revoke endpoint, and a gated read endpoint from scope right when the schema is being locked down — real scope reduction, not just deferral of polish. Nothing else in the schema depends on it (DDD 3.7: revoking a grant needs no cascading cleanup, so it was already isolated). | Loses the "build it while the model's young" cost advantage the original entry was banking on — if this comes back later, it's a real retrofit onto a schema that wasn't designed with it in mind. |
+
+### Decision
+
+Option B. PRD 5.8 removed from MVP scope; PRD 3, 6, and 7 updated
+accordingly. Moves to PRD 8 (future direction, not committed) alongside
+the already-listed richer shared-budget ideas.
+
+### Rationale
+
+The original decision's cost argument (cheaper now than later) is real,
+but it was already trading against a feature with no validated need —
+PRD 3 flagged that gap on day one. With the ER diagram underway, the
+concrete cost of carrying it (a grant table, two endpoints, cross-account
+read gating) is now visible and outweighs building for a hypothetical
+second user who may never materialize. Nothing is lost permanently —
+just not paid for until there's an actual person to build it for.
+
+---
+
+<a id="basic-needs-variable"></a>
+## 2026-09-22 — Basic needs: ship a default set, not a fixed list
+
+**Status:** Decided. Revises the "fixed app-defined list" detail in
+[Cycle budget formula](#budget-formula) — that entry's formula and
+editable-suggestion rules are unaffected.
+
+### Context
+
+Basic needs was specified as a fixed, app-defined list of exactly 4
+categories (rent, electricity/water/gas, transportation, food). Working
+through the ER diagram (#7) surfaced why that doesn't hold up: real
+basic needs differ person to person — children, a recurring medical
+condition, monthly dental care are all real fixed costs a fixed 4-item
+list has no room for. The reverse is also true: not everyone pays for
+all 4 (e.g. electricity bundled into rent, or not applicable at all).
+
+### Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Keep the fixed 4-category list | Simplest possible schema (4 flat columns); matches the original spec. | Doesn't generalize past the developer's own situation — exactly the failure mode a "not a proof of concept" MVP (DDD 2) shouldn't have baked into its core budget math. |
+| **B. Ship rent/electricity/transport/food as pre-filled defaults; user can add or remove items freely** ✅ chosen | Solves the generalization problem — any real basic need (childcare, medical, dental) can be added, and inapplicable defaults (no electricity bill) can be removed. Keeps the easy-onboarding benefit of a non-empty starting list. The budget formula is unaffected either way — it only ever needed the *sum* of whatever basic needs exist, not a fixed shape. | Expense capture's basic-needs/discretionary category check (PRD 5.3, docs/decisions.md "Basic needs vs. logged expenses") now matches against a per-user, variable list instead of a fixed global enum — a different implementation, not a harder one, but real work to account for when that ticket gets built. |
+| C. Fully freeform, no defaults at all | Maximally flexible. | Reintroduces the blank-page problem at onboarding that having *any* starting list avoids. No reason to give up the default just to get the flexibility — both are available in option B. |
+
+### Decision
+
+Option B. Basic needs becomes a variable, user-editable set of
+(name, amount) items, pre-filled with the original 4 as defaults a user
+can remove. Stored as JSON on the `budget cycle` row rather than fixed
+columns or a normalized child table — nothing in the product needs to
+query *inside* the list (no "find every cycle with a 'rent' item"), so
+the simpler shape wins for now.
+
+### Rationale
+
+The fixed list was never a deliberate constraint — it was inherited
+from the original budget-formula entry's example categories without
+being reconsidered on its own terms. Once actually examined against
+real cases (dependents, ongoing medical costs, bills that don't apply),
+a fixed list is a correctness bug in the budget math, not just a UX
+limitation: an unaccounted-for real cost makes the suggested budget
+wrong, not just less convenient. Defaults-plus-editable keeps the
+onboarding experience just as easy while removing that ceiling.
