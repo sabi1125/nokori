@@ -46,6 +46,9 @@ external nice-to-have:
   controller/interactor/repository layers, mocked interfaces via
   `go:generate mockgen`, structured logging via zap, env-based config
   that fails loud on anything missing.
+- **Email delivery**: Resend, for the one-time login-verification code
+  (see decisions.md "Email verification"). No other transactional email
+  in v1.
 - **API documentation**: OpenAPI, hand-authored in `open-api/` and
   viewed via Scalar — designed before the backend implements it, not
   generated from code that already exists (see decisions.md). `open-api/`
@@ -83,6 +86,12 @@ subsequent requests are authenticated with it. This is the only auth
 method — no OAuth, from Apple or anyone else (see decisions.md: since
 there's no third-party login of any kind, Apple's Sign in with Apple
 requirement never actually applies).
+
+The user's first login attempt after signup is gated on email
+verification: the backend generates a one-time code, sends it via
+Resend, and that login only completes once the code is confirmed.
+Every login after that proceeds normally (see decisions.md "Email
+verification").
 
 ### 3.2 Expense capture
 
@@ -145,19 +154,14 @@ The backend's job is serving that list back — paginated per cycle — with
 the exact same code path for a live cycle and a cycle from six months
 ago, not two different ones.
 
-### 3.7 Shared read-only view
+### 3.7 Shared read-only view — dropped from MVP
 
-A user invites another existing account by some identifier (exact
-mechanism — email, username, code — left to schema/API design); the
-backend records a one-directional grant from the inviter to the invited
-viewer. On request, the backend checks that grant before returning
-anything, then serves only the inviter's current live-meter figures
-(PRD 5.8) — not their expense history, not their settings, not their
-salary/basic-needs inputs. The viewer's client can read this the same
-way it reads its own account's meter, just against a different
-account's data, gated entirely by the grant's existence. Revoking a
-grant is a delete of that record — no cascading cleanup needed, since
-nothing else was ever derived from it.
+Dropped from scope (see docs/decisions.md "Shared read-only view:
+dropped from MVP") — not part of the current system shape. Left here
+only as a pointer in case it returns post-MVP: the original shape would
+have been a one-directional grant record (inviter → viewer) gating a
+read of the inviter's live-meter figures only, revoked by a plain
+delete of that record.
 
 ## 4. Client/backend boundary — what stays on-device
 

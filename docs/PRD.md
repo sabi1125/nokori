@@ -30,10 +30,9 @@ The primary user for v1 is the developer themself — this is a
 dogfooding-first product. The design should hold up for a single, real,
 daily user before any thought is given to a wider audience.
 
-The one exception is the shared read-only view (5.8): it's built as part
-of MVP scope, but there's no specific second person lined up to use it
-yet. It ships code-complete against its spec, not proven through actual
-daily two-person use the way the rest of MVP is (see 7).
+A shared read-only view was considered for MVP but dropped (see
+docs/decisions.md "Shared read-only view: dropped from MVP") — no
+specific second person exists yet to build or validate it against.
 
 ## 4. Core value proposition
 
@@ -57,6 +56,10 @@ daily two-person use the way the rest of MVP is (see 7).
   Apple, no Google, no OAuth of any kind (see decisions.md: Apple only
   requires Sign in with Apple when the app offers a third-party login as
   an option, which this deliberately never does).
+- Email verification: a one-time code is sent (via Resend) on the
+  user's first login attempt after signup, not at signup itself, and
+  that login doesn't complete until the code is entered correctly. See
+  decisions.md "Email verification".
 - Basic account settings: change salary date, update salary and
   basic-needs amounts (recomputes the suggested budget — see 5.2),
   delete account, manage AI key (below).
@@ -65,9 +68,11 @@ daily two-person use the way the rest of MVP is (see 7).
 
 - User sets a recurring salary date (day of month). On setup, and again
   whenever it changes, they also enter their salary and their basic
-  needs for the cycle — a fixed, app-defined set of categories (rent,
-  electricity/water/gas, transportation, food) with a user-entered
-  amount each.
+  needs for the cycle — pre-filled with a default set (rent,
+  electricity/water/gas, transportation, food), each editable, plus the
+  ability to add or remove items freely (e.g. childcare, medical,
+  dental — or remove a default that doesn't apply). See
+  docs/decisions.md "Basic needs: ship a default set, not a fixed list."
 - From salary and basic needs, the app computes a suggested cycle
   budget with a fixed formula, adapted from the well-known 50/30/20
   personal-budgeting rule: `salary − basic needs − (20% of salary set
@@ -114,9 +119,9 @@ In both the photo and voice paths, the user confirms/edits the
 extracted result before it's saved — the app should never silently log
 a guessed number.
 
-Categories split into two kinds: **basic-needs categories** (the same
-fixed list used in 5.2 — rent, electricity/water/gas, transportation,
-food) and **discretionary categories** (everything else). This isn't
+Categories split into two kinds: **basic-needs categories** (whatever
+the user's current basic-needs list from 5.2 contains — not a fixed
+list) and **discretionary categories** (everything else). This isn't
 just labeling — see 5.4 for why it matters to the meter.
 
 ### 5.4 Live budget meter
@@ -146,6 +151,10 @@ just labeling — see 5.4 for why it matters to the meter.
 - Once per cycle, the user can request an AI-generated summary of their
   spending behavior for that cycle (patterns, notable changes vs. their
   own history — not compared to any external population).
+- Output includes concrete recommendations alongside the narrative —
+  suggestions to review, never silently applied to the budget or
+  settings (see docs/decisions.md "AI monthly analysis: add
+  recommendations").
 - Users on the app's own AI access get one analysis per cycle.
 - Users who supply their own AI provider key are not limited by the
   app and are billed directly by their provider.
@@ -175,24 +184,6 @@ reflection; this puts the current cycle up against the previous one.
 - Users who supply their own AI provider key are not limited by the app
   and are billed directly by their provider, same as 5.6.
 
-### 5.8 Shared read-only view
-
-A user can invite another existing Nokori account to view their current
-cycle, read-only.
-
-- Visible to the invited viewer: the live meter (remaining budget,
-  pacing) only — not itemized expense history, not account settings,
-  not the salary/basic-needs figures behind the budget. (This is a
-  starting default, not researched against what's actually useful once
-  there's a real second user to ask — worth revisiting then.)
-- One-directional per invite: inviting someone to view your cycle
-  doesn't grant you the reverse. Mutual visibility is just two separate
-  invites.
-- Either side can revoke the connection at any time.
-- The viewer has no write access whatsoever — can't log an expense on
-  the other person's behalf, edit anything, or get notified of their
-  activity. Pure read access to the meter, nothing else.
-
 ## 6. Explicit non-goals for v1
 
 To keep the MVP shippable, the following are deliberately out of scope
@@ -205,10 +196,10 @@ and deferred to later phases:
   a registered business, this stays out of scope indefinitely rather
   than "coming eventually."
 - Multi-currency support.
-- Full shared/family budgets — joint editing, a combined pooled budget,
-  anything beyond a one-directional read-only view. (The read-only view
-  itself is in MVP scope — see 5.8. This non-goal is about anything past
-  that.)
+- Shared/family budgets of any kind — including the one-directional
+  read-only view previously scoped for MVP, now dropped (see
+  docs/decisions.md "Shared read-only view: dropped from MVP"). See PRD
+  8 for its possible return post-MVP.
 - Android or any non-iOS platform.
 - Per-item price history / barcode-based product tracking.
 - Push notifications / proactive nudges (may follow shortly after MVP,
@@ -228,10 +219,6 @@ cycle, exclusively use Nokori (no spreadsheet, no other app) to:
 5. Use the cycle comparison at least once mid-cycle and get a comparison
    against last cycle that's actually worth checking again.
 
-The shared read-only view (5.8) is a deliberate exception to the above:
-"done" for it means it works correctly against its spec (invite, view,
-revoke) — there's no second real person to validate it through actual
-daily use yet, unlike everything else on this list.
 
 ## 8. Future direction (post-MVP, not committed)
 
@@ -240,7 +227,8 @@ daily use yet, unlike everything else on this list.
   the intended trajectory).
 - Per-item cost-per-use / price-history tracking for recurring
   purchases.
-- Richer shared budgets — mutual/joint visibility, combined budgets —
-  beyond the one-directional read-only view already in MVP (5.8).
+- Shared budgets in some form — starting with the one-directional
+  read-only view dropped from MVP, up through richer mutual/joint
+  visibility and combined budgets.
 - Richer, more proactive AI behavior (mid-cycle warnings, not just
   end-of-cycle summaries).
