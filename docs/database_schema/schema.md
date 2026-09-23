@@ -10,7 +10,7 @@ erDiagram
     BUDGET_CYCLE ||--o{ CYCLE_COMPARISON : has
 
     USER {
-        int id PK
+        string id PK
         string first_name
         string last_name
         string email
@@ -21,24 +21,24 @@ erDiagram
     }
 
     VERIFICATION_CODE {
-        int id PK
-        int user_id FK
+        string id PK
+        string user_id FK
         string code
         datetime expires_at
         datetime created_at
     }
 
     SETTINGS {
-        int id PK
-        int user_id FK
+        string id PK
+        string user_id FK
         int default_salary_date
         datetime created_at
         datetime updated_at
     }
 
     BUDGET_CYCLE {
-        int id PK
-        int user_id FK
+        string id PK
+        string user_id FK
         date start_month
         date end_month
         int salary
@@ -49,8 +49,8 @@ erDiagram
     }
 
     EXPENSES_HISTORY {
-        int id PK
-        int budget_cycle_id FK
+        string id PK
+        string budget_cycle_id FK
         int spent
         string item_name
         string category
@@ -59,16 +59,16 @@ erDiagram
     }
 
     MONTHLY_ANALYSIS {
-        int id PK
-        int budget_cycle_id FK
+        string id PK
+        string budget_cycle_id FK
         text ai_analysis
         text recommendations
         datetime created_at
     }
 
     CYCLE_COMPARISON {
-        int id PK
-        int budget_cycle_id FK
+        string id PK
+        string budget_cycle_id FK
         text comparison_text
         json category_breakdown
         int comparison_count
@@ -78,6 +78,9 @@ erDiagram
 
 ## Notes
 
+- All primary/foreign keys are UUIDs (`string` here, `CHAR(36)` in the
+  actual migrations — see `backend/migrations/`) — not auto-increment
+  integers.
 - `SETTINGS` is 1:1 with `USER` — just `default_salary_date`. Salary
   and basic needs live on `BUDGET_CYCLE` instead (see decisions.md
   "Basic needs: ship a default set, not a fixed list").
