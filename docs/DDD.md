@@ -87,11 +87,11 @@ method — no OAuth, from Apple or anyone else (see decisions.md: since
 there's no third-party login of any kind, Apple's Sign in with Apple
 requirement never actually applies).
 
-The user's first login attempt after signup is gated on email
-verification: the backend generates a one-time code, sends it via
-Resend, and that login only completes once the code is confirmed.
-Every login after that proceeds normally (see decisions.md "Email
-verification").
+Signup creates the user unverified and immediately sends a one-time
+code via Resend; a verify call confirms it. Login is refused until the
+account is verified. A resend call issues a fresh code, and a periodic
+job removes accounts that never get verified (see decisions.md "Email
+verification: send the code at signup").
 
 ### 3.2 Expense capture
 

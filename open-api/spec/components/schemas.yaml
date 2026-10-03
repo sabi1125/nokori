@@ -1,0 +1,28 @@
+# Data shapes reused across endpoints. One top-level key per schema.
+
+Error:
+  type: object
+  required: [code, message]
+  properties:
+    code:
+      type: string
+      example: service_unavailable
+    message:
+      type: string
+      example: Database is unreachable.
+
+Success:
+  type: object
+  required: [status]
+  properties:
+    status:
+      type: string
+      example: Success
+
+HealthResponse:
+  type: object
+  required: [status]
+  properties:
+    status:
+      type: string
+      example: ok

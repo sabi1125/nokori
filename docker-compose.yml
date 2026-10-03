@@ -5,6 +5,18 @@ services:
       - "3000:80"
     volumes:
       - ./open-api/public:/usr/share/nginx/html:ro
+    depends_on:
+      - open-api-bundler
+  # Dev only: rebuilds open-api/public/openapi.yaml from open-api/spec/
+  # on every save (Scalar can't follow $refs across files).
+  open-api-bundler:
+    build:
+      context: ./open-api
+      target: bundler
+    user: "1000:1000"
+    volumes:
+      - ./open-api:/open-api
+    command: watch-bundle
 # TODO: the credentials are subject to change
   mysql:
     image: mysql:8.4

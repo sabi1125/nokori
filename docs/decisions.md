@@ -36,10 +36,12 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-09-14 | [Shared read-only view](#sharing) | Part of MVP: one-directional, meter-only, revocable — no second user to validate against yet | Superseded — see below |
 | 2026-09-14 | [Frontend build/distribution](#frontend-build) | Build and install locally via Xcode for now; CI deferred | Decided |
 | 2026-09-14 | [Ticket tracking](#tickets) | GitHub Issues + GitHub Projects | Decided |
-| 2026-09-16 | [Email verification](#email-verification) | One-time code, sent on first post-signup login attempt (not at signup), which is blocked until verified; delivered via Resend | Decided |
+| 2026-09-16 | [Email verification](#email-verification) | One-time code, sent on first post-signup login attempt (not at signup), which is blocked until verified; delivered via Resend | Timing superseded — see below; Resend still stands |
 | 2026-09-16 | [AI monthly analysis: add recommendations](#analysis-recommendations) | Pulled into MVP now — same AI call, same cap, richer output | Decided |
 | 2026-09-16 | [Shared read-only view: dropped from MVP](#sharing-dropped) | Cut entirely for now — supersedes the earlier "part of MVP" decision | Decided |
 | 2026-09-22 | [Basic needs: default set, user-editable](#basic-needs-variable) | Not fixed to 4 categories — ship with rent/utilities/transport/food pre-filled, user can add or remove | Decided (supersedes "fixed, app-defined" in the budget-formula entry) |
+| 2026-10-03 | [OpenAPI spec: split by epic, bundled for Scalar](#api-spec-split) | `open-api/spec/` split into `paths/<epic>.yaml` + `components/`, short descriptive keys; a dev container bundles it into the one file Scalar serves | Decided |
+| 2026-10-04 | [Email verification: send the code at signup](#email-verification-signup) | User row created unverified at signup and the code sent right then; login refused until verified | Decided (supersedes the timing in "Email verification") |
 
 ---
 
@@ -694,9 +696,11 @@ this ever becomes a multi-person project later.
 <a id="email-verification"></a>
 ## 2026-09-16 — Email verification: one-time code, triggered by first login, not signup
 
-**Status:** Decided. Not previously written down despite being treated
-as settled — recorded here now so it's actually checkable instead of
-just remembered.
+**Status:** Timing superseded — see [Email verification: send the code
+at signup](#email-verification-signup). The delivery choice (Resend)
+still stands. Originally: not previously written down despite being
+treated as settled — recorded here now so it's actually checkable
+instead of just remembered.
 
 ### Context
 
@@ -866,3 +870,92 @@ a fixed list is a correctness bug in the budget math, not just a UX
 limitation: an unaccounted-for real cost makes the suggested budget
 wrong, not just less convenient. Defaults-plus-editable keeps the
 onboarding experience just as easy while removing that ceiling.
+
+---
+
+<a id="api-spec-split"></a>
+## 2026-10-03 — OpenAPI spec: split by epic, bundled for Scalar
+
+**Status:** Decided. Builds on [API documentation: spec-first](#api-docs-final).
+
+### Context
+
+Starting the first real endpoint (signup, #61) raised how the spec
+should be laid out. One `openapi.yaml` holding every endpoint gets hard
+to find things in as it grows. Testing a split showed that Scalar (CDN
+build) doesn't follow `$ref`s into other files — it only fetched
+`openapi.yaml` and rendered every external ref as empty.
+
+### Layout
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. One file | No tooling; Scalar reads it directly. | Hard to navigate once there are ~20 endpoints. |
+| **B. Split by epic** ✅ chosen | Matches how the work is already organized (one epic → one `paths/<epic>.yaml`), so "where is signup?" has an obvious answer. | `openapi.yaml` still has to list every URL; needs a bundling step for Scalar. |
+| C. One file per endpoint | Smallest files. | Many tiny files; endpoints in one epic share shapes and are designed together. |
+
+Within B: `paths/` holds endpoints (one file per epic, plus
+`system.yaml` for ops endpoints like `/health`); `components/` holds
+reused pieces (`schemas.yaml` for data shapes, `responses.yaml` for
+whole error responses). Every non-2xx response body uses the shared
+`Error` schema (`code` for the client to branch on, `message` for
+humans).
+
+### Keys inside an epic file
+
+| Option | Pros | Cons |
+|---|---|---|
+| URL as key (`/auth/signup`) | Can't drift from the real URL. | `/` must be escaped as `~1` in every pointer: `#/~1auth~1signup`. |
+| **Short descriptive key (`signup`)** ✅ chosen | Readable refs: `./paths/account.yaml#/signup`. | Key and URL can drift apart — rule: keys must say clearly what the endpoint does. |
+
+### Serving it to Scalar
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Bundler container** ✅ chosen | Keeps the split *and* save-and-refresh: `open-api-bundler` polls `spec/` and rebuilds `public/openapi.yaml` (Redocly CLI) on every change. | One more container; `public/openapi.yaml` becomes generated (gitignored, never hand-edited). |
+| B. Back to one file | No tooling. | Loses the reason for splitting. |
+| C. Bundle only at image build | No extra container. | Rebuild after every edit — kills save-and-refresh. |
+
+The production image bundles in its own build stage, so it doesn't
+depend on the dev container.
+
+---
+
+<a id="email-verification-signup"></a>
+## 2026-10-04 — Email verification, superseding the timing above: send the code at signup
+
+**Status:** Decided. Supersedes the "when the code is sent" part of
+[Email verification](#email-verification). Delivery via Resend is
+unchanged.
+
+### Context
+
+Designing the signup spec (#61) brought the flow back up. Sending the
+code on the first login attempt means a person finishes signup, gets
+nothing, and only meets the code screen later — a detour with no
+benefit. Separately, how to hold a not-yet-verified signup came up:
+as a user row, or only as a code keyed by email.
+
+### Options
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Code at first login attempt (previous decision) | Signup stays one step; schema already fits. | Splits one task (sign up and confirm the email) across two moments for no real gain — the person just typed their email and expects the code now. |
+| **B. Create the user unverified at signup and send the code right then** ✅ chosen | Signup → code screen is one continuous flow. Schema already fits as-is (`users.verified`, `verification_codes.user_id`) — no migration. | Unverified user rows exist until confirmed, so a cleanup job is needed. Needs a resend endpoint, since an expired code would otherwise lock that email out (`users.email` is UNIQUE). |
+| C. Don't create the user until the code is confirmed; store only the code, keyed by email | No unverified user rows. | Expired codes still need cleaning up, so it doesn't remove the cleanup job — it just moves it. Needs a migration (`user_id` → `email`, drop `verified`). |
+
+### Decision
+
+Option B. Signup creates the user with `verified = false` and sends the
+code via Resend. A separate verify call checks the code and sets
+`verified = true`. Login is refused for unverified users with its own
+error code, so the client knows to show the code screen. A resend call
+issues a fresh code. A periodic job deletes users that stay unverified
+past a retention window (window still to be decided — own ticket).
+
+### Rationale
+
+Sending at signup matches what the person is doing at that moment. B
+over C because both need a cleanup job anyway, and B fits the schema
+that already exists.
+

@@ -56,10 +56,11 @@ specific second person exists yet to build or validate it against.
   Apple, no Google, no OAuth of any kind (see decisions.md: Apple only
   requires Sign in with Apple when the app offers a third-party login as
   an option, which this deliberately never does).
-- Email verification: a one-time code is sent (via Resend) on the
-  user's first login attempt after signup, not at signup itself, and
-  that login doesn't complete until the code is entered correctly. See
-  decisions.md "Email verification".
+- Email verification: a one-time code is sent (via Resend) at signup,
+  and the account can't log in until the code is entered correctly. A
+  new code can be requested if it expires; accounts left unverified are
+  cleaned up after a while. See decisions.md "Email verification: send
+  the code at signup".
 - Basic account settings: change salary date, update salary and
   basic-needs amounts (recomputes the suggested budget — see 5.2),
   delete account, manage AI key (below).

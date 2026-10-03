@@ -15,36 +15,50 @@ lives in `docs/`:
 Documented here so any session (any machine) knows where things land,
 rather than guessing:
 
-- `open-api/` — **exists.** `open-api/public/` holds the served files:
-  hand-authored `openapi.yaml` and `index.html` (Scalar via CDN script).
-  `open-api/Dockerfile` just copies `public/` into nginx. Written before
-  backend implementation, no dependency on `backend/` existing (see
-  docs/decisions.md — "API documentation, spec-first"). Fill in
-  `paths`/`components.schemas` in `openapi.yaml` as the API contract
-  gets designed — that design work happens in this file, not in code.
-  Has one real path so far: `GET /health`.
-- `backend/` — not created yet. Go backend, its own Dockerfile, local
-  port **8080** (already assumed by `open-api/public/openapi.yaml`'s
-  `servers` block). Built *to* whatever the spec specifies once that's
-  designed.
-- `frontend/` — not created yet. Flutter app, its own Dockerfile.
+- `open-api/` — the API contract, written before the backend implements
+  it, no dependency on `backend/` (see docs/decisions.md — "API
+  documentation, spec-first" and "OpenAPI spec: split by epic").
+  - `spec/` — **the files you edit.** `openapi.yaml` is the table of
+    contents: every URL listed, each `$ref`-ing a short descriptive key
+    in `paths/<epic>.yaml` (`paths/system.yaml` for non-epic endpoints
+    like `/health`). Reused pieces live in `components/schemas.yaml`
+    (data shapes, incl. the shared `Error`) and
+    `components/responses.yaml` (whole error responses). `$ref`s resolve
+    relative to the file they're in — from `paths/`, components are
+    `../components/...`.
+  - `public/` — what nginx serves: `index.html` (Scalar via CDN) and
+    `openapi.yaml`, which is **generated** from `spec/` (gitignored,
+    never edit it). Scalar can't follow `$ref`s across files, hence the
+    bundle.
+  - `Dockerfile` — stage 1 bundles `spec/` with Redocly CLI (also run on
+    its own as the dev watcher), stage 2 serves it from nginx.
+- `backend/` — **exists.** Go backend (CodeSeed scaffold), its own
+  Dockerfile, local port **8080**. Migrations in `backend/migrations/`.
+  Built *to* whatever the spec specifies.
+- `frontend/` — **exists** (Flutter skeleton only). Built and run via
+  Xcode, no Dockerfile.
 - `docs/` — PRD, DDD, decisions.md, and diagrams (ER, state, etc.) — can
   be split into subfolders for cleanliness as it grows.
-- Root `docker-compose.yml` — **exists**, with the `open-api` service
-  (port **3000**). Add `backend`/`frontend` services here as those roots
-  get built, rather than a separate compose file per service.
+- Root `docker-compose.yml` — `open-api` (port **3000**),
+  `open-api-bundler` (dev watcher), `mysql` (3306), `backend` (8080).
+  Add services here rather than a separate compose file per service.
 
-**Running `open-api` for local dev**: `docker compose up --build` from
-the repo root (drop `--build` after the first run, or whenever
-`open-api/Dockerfile` itself hasn't changed). `open-api/public/` is
-bind-mounted as a *directory*, not individual files — editing
-`openapi.yaml` or `index.html` shows up on a browser refresh with no
-rebuild or restart needed. This only works because it's a directory
-mount: a single-*file* bind mount breaks the moment the file is edited
-by anything that saves via atomic rename (which is most editors,
-including VS Code's default, and `sed -i`) — the mount stays pinned to
-the old inode and silently keeps serving stale content. Don't go back to
-per-file mounts here even though it looks more precise; it isn't.
+**Running `open-api` for local dev**: `docker compose up --build
+open-api` from the repo root (drop `--build` unless `open-api/Dockerfile`
+or the bundler script changed). This also starts `open-api-bundler`,
+which rebuilds `public/openapi.yaml` within ~1s of any save under
+`spec/` — refresh the browser to see it. If the page stops updating,
+check `docker compose logs open-api-bundler` for `bundle FAILED`. Note
+the bundler only catches YAML/`$ref` breakage; a typo'd OpenAPI keyword
+(e.g. `request:` instead of `requestBody:`) is silently ignored by
+Scalar — `npx @redocly/cli lint open-api/spec/openapi.yaml` catches
+those.
+
+`open-api/public/` is bind-mounted as a *directory*, not individual
+files. Keep it that way: a single-*file* bind mount breaks the moment
+the file is replaced via atomic rename (most editors, `sed -i`, and the
+bundler itself) — the mount stays pinned to the old inode and silently
+keeps serving stale content.
 
 Build each root when its own work actually starts, not pre-emptively —
 same reasoning as not pre-creating empty nested `CLAUDE.md` files below.
@@ -67,6 +81,18 @@ same reasoning as not pre-creating empty nested `CLAUDE.md` files below.
   parent tickets": GitHub has no built-in search qualifier for
   sub-issues (`has:sub-issues` looks plausible but silently does
   nothing) — filter with `label:epic` instead.
+- **Every title starts with its kind: `[Epic]`, `[Docs]` or `[Impl]`.**
+  The type label backs it up: `[Docs]` tickets carry `docs`; `[Impl]`
+  tickets carry `feature`, `chore` or `bug`.
+- **Design comes before implementation, and the tree shows it:**
+  `[Epic]` → `[Docs]` design ticket → the `[Impl]` tickets that build on
+  that design. Backend work sits under a `[Docs] API spec: …` ticket
+  (done when the contract is in `openapi.yaml`); frontend work sits under
+  a `[Docs] UI design: …` ticket (done when the sketch is in `docs/ui/`).
+  Every `[Impl]` ticket has a `[Docs]` parent. To move an existing child
+  to a new parent, add `-F replace_parent=true` to the sub_issues call.
+- Work outside any PRD feature (setup, tooling, docs upkeep) goes under
+  `[Epic] Project setup & housekeeping` (#84).
 - **Keep tickets short.** State the goal and the done-when condition
   plainly. Don't restate context that's already in `docs/` — link to the
   relevant `decisions.md` entry instead of re-explaining the reasoning
