@@ -1,0 +1,22 @@
+# Endpoints that belong to no PRD epic (ops/infra).
+# Each top-level key is one URL's path item; openapi.yaml points at it
+# by key, e.g. './paths/system.yaml#/health'.
+# $refs in this file resolve relative to THIS file's folder.
+
+health:
+  get:
+    summary: Health check
+    description: >
+      Liveness check for the backend — no auth required. Returns 200
+      if the service is up and able to reach its dependencies.
+    operationId: getHealth
+    tags: [System]
+    responses:
+      '200':
+        description: Service is healthy
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthResponse'
+      '503':
+        $ref: '../components/responses.yaml#/ServiceUnavailable'

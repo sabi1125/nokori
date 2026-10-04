@@ -1,0 +1,33 @@
+# Whole error responses reused across endpoints (status description +
+# body). Endpoints point at these instead of repeating them. One
+# top-level key per response.
+
+ServiceUnavailable:
+  description: A dependency (e.g. the database) is unreachable.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/Error'
+      example:
+        code: service_unavailable
+        message: Database is unreachable.
+
+BadRequest:
+  description: Parameters given for request are invalid.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/Error'
+      example:
+        code: invalid_parameters
+        message: Request includes invalid parameters.
+
+InternalError:
+  description: Something went wrong.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/Error'
+      example:
+        code: internal_error
+        message: Something went wrong. Please wait and try again.

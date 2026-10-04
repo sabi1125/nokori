@@ -1,0 +1,83 @@
+signup:
+  post:
+    summary: Signup
+    description: |
+      Creates new user account.
+      * Takes first_name, last_name, email, password.
+        * white spaces will be trimmed except for password.
+        * email address will be changed to lowercase.
+      * Check if valid first_name, last_name, email, password.
+        * If any of the above is invalid returns with status code 400.
+        * Verify that the password provided is in ASCII.
+      * If email address already exists and is not verified yet.
+        * Returns with status code 409 (email_not_verified).
+      * If the email address already exists and is verified.
+        * Returns with status code 409 (user_already_exists).
+      * If email address does not exist.
+        * User record is created.
+        * Send OTP(one time password) to the email address provided.
+
+
+    operationId: signup
+    tags: [Account]
+    requestBody:
+      description: Parameters required to create user account.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: 
+              - first_name
+              - last_name
+              - email
+              - password
+            properties:
+              first_name:
+                type: string
+                minLength: 1
+                maxLength: 255
+                example: john
+              last_name:
+                type: string
+                minLength: 1
+                maxLength: 255
+                example: doe
+              email:
+                type: string
+                format: email
+                maxLength: 255
+                example: john@doe.com
+              password:
+                type: string
+                minLength: 8
+                maxLength: 72
+                format: password
+                example: password
+    responses:
+      '201':
+        description: User created successfully
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '409':
+        description: Email already registered but has cases of verified or not.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Error'
+            examples:
+              UnverifiedEmail:
+                summary: "Provided email has not been verified yet."
+                value:
+                  code: email_not_verified
+                  message: Account for the provided email address has not been verified.
+              UserAlreadyExists:
+                summary: "Provided email already exists."
+                value:
+                  code: user_already_exists
+                  message: Account for the provided email address is already registered.
+      '503':
+        $ref: '../components/responses.yaml#/ServiceUnavailable'
+      '500':
+        $ref: '../components/responses.yaml#/InternalError'
+

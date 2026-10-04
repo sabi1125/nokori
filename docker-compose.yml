@@ -1,10 +1,29 @@
 services:
   open-api:
-    build: ./open-api
+    # Dev serves the bind-mounted public/ as-is, so a plain nginx is
+    # enough; the bundling image (open-api/Dockerfile) is for deploys.
+    image: nginx:alpine
     ports:
       - "3000:80"
     volumes:
       - ./open-api/public:/usr/share/nginx/html:ro
+    depends_on:
+      open-api-bundler:
+        condition: service_healthy
+  # Dev only: rebuilds open-api/public/openapi.yaml from open-api/spec/
+  # on every save (Scalar can't follow $refs across files).
+  open-api-bundler:
+    build:
+      context: ./open-api
+      target: bundler
+    volumes:
+      - ./open-api:/open-api
+    command: watch-bundle
+    # Healthy once a bundle exists, so a fresh clone doesn't serve a 404.
+    healthcheck:
+      test: ["CMD", "test", "-f", "public/openapi.yaml"]
+      interval: 2s
+      retries: 30
 # TODO: the credentials are subject to change
   mysql:
     image: mysql:8.4
