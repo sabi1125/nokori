@@ -42,6 +42,7 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-09-22 | [Basic needs: default set, user-editable](#basic-needs-variable) | Not fixed to 4 categories — ship with rent/utilities/transport/food pre-filled, user can add or remove | Decided (supersedes "fixed, app-defined" in the budget-formula entry) |
 | 2026-10-03 | [OpenAPI spec: split by epic, bundled for Scalar](#api-spec-split) | `open-api/spec/` split into `paths/<epic>.yaml` + `components/`, short descriptive keys; a dev container bundles it into the one file Scalar serves | Decided |
 | 2026-10-04 | [Email verification: send the code at signup](#email-verification-signup) | User row created unverified at signup and the code sent right then; login refused until verified | Decided (supersedes the timing in "Email verification") |
+| 2026-10-04 | [Signup: repeat signups, cleanup, account enumeration](#signup-repeat) | Existing email → 409 with `email_not_verified` or `user_already_exists`, never overwritten; one valid code per user; unverified accounts deleted after 7 days; no deep link; rare edge cases accepted | Decided |
 
 ---
 
@@ -958,4 +959,58 @@ past a retention window (window still to be decided — own ticket).
 Sending at signup matches what the person is doing at that moment. B
 over C because both need a cleanup job anyway, and B fits the schema
 that already exists.
+
+---
+
+<a id="signup-repeat"></a>
+## 2026-10-04 — Signup: repeat signups, cleanup, account enumeration
+
+**Status:** Decided. Extends [Email verification: send the code at
+signup](#email-verification-signup); came out of the PR #88 review of
+the signup spec (#61).
+
+### Context
+
+With the user row created unverified at signup, a person who closes the
+app before entering the code (or whose code email fails to send) tries
+to sign up again — and hits their own unverified row. Options for that
+second attempt:
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Allow duplicate email rows until one is verified | No lockout. | Fights `users.email UNIQUE`; MySQL has no partial unique index; unclear which row wins. |
+| B. Rely on the periodic cleanup only | Nothing new to build. | The person stays locked out until the next cleanup. |
+| C. Replace the unverified row with the new signup | No lockout. | Anyone typing that email can overwrite the password on someone's pending signup. |
+| **D. Never overwrite; return 409 and let the client route** ✅ chosen | No lockout (code screen + resend), no overwrite. Simplest. | A stranger who signs up first with your email blocks your own signup until cleanup — accepted, see below. |
+
+### Decision
+
+- Signup with an email that already exists returns **409** and never
+  creates or changes a row. The `Error.code` tells the client where to
+  go:
+  - `email_not_verified` → the code entry screen (with resend).
+  - `user_already_exists` → login.
+- **One valid code per user at a time.** Resend replaces any existing
+  code with a fresh one. Code lifetime: **not set yet** — decide when
+  speccing verify/resend (#63).
+- **Cleanup:** a periodic job deletes accounts that stay unverified for
+  **7 days**, which frees the email to sign up again.
+- **No deep link** in the code email — the user types the code. Avoids
+  Universal Link setup for no security gain (a link and a code both only
+  prove inbox access).
+- Passwords are ASCII-only (so `maxLength: 72` matches bcrypt's 72-byte
+  limit); names are trimmed and emails lowercased before validating.
+
+### Accepted risks
+
+- **Account enumeration:** the 409 reveals whether an email is
+  registered. Low stakes for a personal expense tracker, and hiding it
+  properly would mean changing login and resend too.
+- **Someone signs up first with another person's email:** the real owner
+  is blocked until cleanup, or verifies an account with the stranger's
+  password and recovers it via password reset. Nothing leaks (the
+  account is empty), and there's little motive to do it.
+
+These are rare cases on an app with this threat model; a fallback is
+the right answer rather than more machinery.
 

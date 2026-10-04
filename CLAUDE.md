@@ -30,8 +30,11 @@ rather than guessing:
     `openapi.yaml`, which is **generated** from `spec/` (gitignored,
     never edit it). Scalar can't follow `$ref`s across files, hence the
     bundle.
-  - `Dockerfile` — stage 1 bundles `spec/` with Redocly CLI (also run on
-    its own as the dev watcher), stage 2 serves it from nginx.
+  - `Dockerfile` — for deploys: `bundler` stage (Redocly CLI + watcher
+    script, no spec; also what `open-api-bundler` runs in dev), `bundle`
+    stage (bundles `spec/` — a broken spec fails the build on purpose),
+    then nginx. In dev, `open-api` is plain `nginx:alpine` serving the
+    bind mount, so a broken spec never blocks startup.
 - `backend/` — **exists.** Go backend (CodeSeed scaffold), its own
   Dockerfile, local port **8080**. Migrations in `backend/migrations/`.
   Built *to* whatever the spec specifies.
@@ -43,9 +46,10 @@ rather than guessing:
   `open-api-bundler` (dev watcher), `mysql` (3306), `backend` (8080).
   Add services here rather than a separate compose file per service.
 
-**Running `open-api` for local dev**: `docker compose up --build
-open-api` from the repo root (drop `--build` unless `open-api/Dockerfile`
-or the bundler script changed). This also starts `open-api-bundler`,
+**Running `open-api` for local dev**: `docker compose up open-api` from
+the repo root (add `--build` after changing `open-api/Dockerfile` or the
+bundler script). This also starts `open-api-bundler` (nginx waits for
+its first bundle),
 which rebuilds `public/openapi.yaml` within ~1s of any save under
 `spec/` — refresh the browser to see it. If the page stops updating,
 check `docker compose logs open-api-bundler` for `bundle FAILED`. Note
@@ -105,6 +109,29 @@ same reasoning as not pre-creating empty nested `CLAUDE.md` files below.
   closing it manually after the fact. Group related tickets under a
   milestone by phase (e.g. "Backend skeleton," "Auth") if useful — no
   obligation to use milestones for everything.
+
+## Code reviews
+
+This is a personal project. Speed matters more than polish.
+
+### Blocking: flag these, and I fix them before moving on
+- Bugs that crash the app or break a core feature
+- Data loss or corruption
+- Security holes (exposed secrets, injection, auth bypass)
+- Anything that would be painful to undo later (data formats, schema, public APIs)
+
+### Non-blocking: don't hold me up over these
+- Naming, style, formatting
+- "Cleaner" or "more idiomatic" ways to write working code
+- Missing tests, unless the code is risky
+- Small performance wins
+- Edge cases that are unlikely in my real usage
+
+### Format
+- Blocking issues go first. For each one: where it is, what breaks, and a hint on where to look.
+- Put non-blocking notes in a short "Later" list of 5 items at most, one line each.
+- If nothing is blocking, say "Nothing blocking" plainly so I can keep going.
+- Don't repeat a "Later" item I've already chosen to skip.
 
 ## Steering documentation
 
