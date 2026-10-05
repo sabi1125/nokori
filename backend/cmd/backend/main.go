@@ -19,6 +19,7 @@ func main() {
 	// Create an Echo instance
 	e := echo.New()
 	e.Use(logger.MiddlewareLogger(logger.Get()))
+	e.HTTPErrorHandler = infrastructure.ErrorHandler
 	infrastructure.Router(e, db)
 
 	// Start the server
