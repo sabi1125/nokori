@@ -20,10 +20,6 @@ func (e *AppError) Unwrap() error {
 	return e.Err
 }
 
-func New(base AppError) *AppError {
-	return &base
-}
-
 func Wrap(base AppError, err error) *AppError {
 	return &AppError{
 		Code:    base.Code,
