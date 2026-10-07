@@ -991,8 +991,10 @@ second attempt:
   - `email_not_verified` → the code entry screen (with resend).
   - `user_already_exists` → login.
 - **One valid code per user at a time.** Resend replaces any existing
-  code with a fresh one. Code lifetime: **not set yet** — decide when
-  speccing verify/resend (#63).
+  code with a fresh one. Code lifetime: **60 seconds** (set 2026-10-07
+  while building signup, #10). Deliberately short: resend is one tap
+  away, and a code that dies fast is useless to anyone who isn't the
+  person signing up right now.
 - **Cleanup:** a periodic job deletes accounts that stay unverified for
   **7 days**, which frees the email to sign up again.
 - **No deep link** in the code email — the user types the code. Avoids
@@ -1010,6 +1012,11 @@ second attempt:
   is blocked until cleanup, or verifies an account with the stranger's
   password and recovers it via password reset. Nothing leaks (the
   account is empty), and there's little motive to do it.
+- **Verification codes are stored in plain text** (added 2026-10-07).
+  Hashing a 6-digit code adds nothing: anyone holding the database can
+  hash all 1,000,000 candidates in under a second. What actually protects
+  a code is the 60-second lifetime and a limit on wrong attempts in the
+  verify step (#63).
 
 These are rare cases on an app with this threat model; a fallback is
 the right answer rather than more machinery.

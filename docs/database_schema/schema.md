@@ -10,7 +10,7 @@ erDiagram
     BUDGET_CYCLE ||--o{ CYCLE_COMPARISON : has
 
     USER {
-        string id PK
+        string user_id PK
         string first_name
         string last_name
         string email
@@ -21,15 +21,16 @@ erDiagram
     }
 
     VERIFICATION_CODE {
-        string id PK
+        string verification_code_id PK
         string user_id FK
         string code
+        string resend_email_id
         datetime expires_at
         datetime created_at
     }
 
     SETTINGS {
-        string id PK
+        string settings_id PK
         string user_id FK
         int default_salary_date
         datetime created_at
@@ -37,7 +38,7 @@ erDiagram
     }
 
     BUDGET_CYCLE {
-        string id PK
+        string budget_cycle_id PK
         string user_id FK
         date start_month
         date end_month
@@ -49,7 +50,7 @@ erDiagram
     }
 
     EXPENSES_HISTORY {
-        string id PK
+        string expenses_history_id PK
         string budget_cycle_id FK
         int spent
         string item_name
@@ -59,7 +60,7 @@ erDiagram
     }
 
     MONTHLY_ANALYSIS {
-        string id PK
+        string analysis_id PK
         string budget_cycle_id FK
         text ai_analysis
         text recommendations
@@ -67,7 +68,7 @@ erDiagram
     }
 
     CYCLE_COMPARISON {
-        string id PK
+        string comparison_id PK
         string budget_cycle_id FK
         text comparison_text
         json category_breakdown
@@ -80,12 +81,16 @@ erDiagram
 
 - All primary/foreign keys are UUIDs (`string` here, `CHAR(36)` in the
   actual migrations — see `backend/migrations/`) — not auto-increment
-  integers.
+  integers. Primary keys are named `<table>_id` (e.g. `users.user_id`),
+  not `id`, so a key has the same name as the foreign keys pointing at it.
 - `SETTINGS` is 1:1 with `USER` — just `default_salary_date`. Salary
   and basic needs live on `BUDGET_CYCLE` instead (see decisions.md
   "Basic needs: ship a default set, not a fixed list").
 - `VERIFICATION_CODE` rows are deleted by app logic on use or expiry —
   no `used` flag needed (see decisions.md "Email verification").
+- `VERIFICATION_CODE.resend_email_id` is nullable: the row is inserted
+  in the signup transaction, before the email is sent, and the ID Resend
+  returns is filled in afterwards.
 - `BUDGET_CYCLE.basic_needs` is JSON: a variable, user-editable list of
   `{name, amount}` items, not a fixed set of columns.
 - `MONTHLY_ANALYSIS` has no cap-counter column: capped at 1/cycle, so
