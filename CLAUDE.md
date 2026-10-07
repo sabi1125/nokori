@@ -36,7 +36,11 @@ rather than guessing:
     then nginx. In dev, `open-api` is plain `nginx:alpine` serving the
     bind mount, so a broken spec never blocks startup.
 - `backend/` — **exists.** Go backend (CodeSeed scaffold), its own
-  Dockerfile, local port **8080**. Migrations in `backend/migrations/`.
+  Dockerfile, local port **8080**. Migrations in `backend/migrations/`,
+  applied automatically on container start (`scripts/entrypoint.sh` runs
+  `migrate up`, and compose waits for MySQL's healthcheck first) — add a
+  new up/down pair, never edit one that has already run. Secrets come
+  from `backend/.env` via compose's `env_file`.
   Built *to* whatever the spec specifies.
 - `frontend/` — **exists** (Flutter skeleton only). Built and run via
   Xcode, no Dockerfile.

@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
+	"time"
 
 	"backend/internal/config"
 	"backend/internal/domain/apperror"
 	"backend/internal/domain/entities"
 	"backend/internal/domain/repository/inputport"
+	"backend/internal/emailtemplate"
 	logger "backend/internal/log"
 	"backend/internal/tx"
 	"backend/internal/util"
@@ -20,23 +22,27 @@ import (
 type AuthInteractor struct {
 	authRepository inputport.AuthRepositoryInputPort
 	userRepository inputport.UserRepositoryInputPort
-
-	resendConfig *config.ResendConfig
-	txManager    tx.Manager
+	resendConfig   *config.ResendConfig
+	uuidGenerator  util.UUIDGenerator
+	timeProvider   util.TimeProvider
+	txManager      tx.Manager
 }
 
 func NewAuthInteractor(
 	authRepository inputport.AuthRepositoryInputPort,
 	userRepository inputport.UserRepositoryInputPort,
 	resendConfig *config.ResendConfig,
+	uuidGenerator util.UUIDGenerator,
+	timeProvider util.TimeProvider,
 	txManager tx.Manager,
 ) *AuthInteractor {
 	return &AuthInteractor{
 		authRepository: authRepository,
 		userRepository: userRepository,
-
-		resendConfig: resendConfig,
-		txManager:    txManager,
+		resendConfig:   resendConfig,
+		uuidGenerator:  uuidGenerator,
+		timeProvider:   timeProvider,
+		txManager:      txManager,
 	}
 }
 
@@ -56,8 +62,7 @@ func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entit
 		return new(apperror.EmailNotVerified)
 	}
 
-	uuid := util.NewUUIDGenerator()
-	newUserId, err := uuid.NewV7()
+	newUserId, err := interactor.uuidGenerator.NewV7()
 	if err != nil {
 		return apperror.Wrap(apperror.InternalError, err)
 	}
@@ -76,7 +81,7 @@ func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entit
 		Verified:     false,
 	}
 
-	newVerificationCodeId, err := uuid.NewV7()
+	newVerificationCodeId, err := interactor.uuidGenerator.NewV7()
 	if err != nil {
 		return apperror.Wrap(apperror.InternalError, err)
 	}
@@ -86,23 +91,29 @@ func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entit
 		return
 	}
 
-	resendSendEmailId, err := interactor.sendEmailWithVerificationCode(ctx, newUser.Email, newVerificationCodeId, verificationCode)
+	resendId, err := interactor.sendEmailWithVerificationCode(newUser.Email, verificationCode)
 	if err != nil {
 		return
 	}
 
-	// TODO: create datetime package in util because we need to create expires_at for the verification code.
+	expiryTime := interactor.timeProvider.Now().Add(verificationCodeLifetime)
+
+	verificationCodeParam := entities.VerificationCodes{
+		VerificationCodeId: newVerificationCodeId,
+		UserId:             newUserId,
+		Code:               verificationCode,
+		ResendEmailId:      resendId,
+		ExpiresAt:          expiryTime,
+	}
 
 	txErr := interactor.txManager.WithinTransaction(ctx, func(ctx context.Context) error {
 		if err := interactor.userRepository.CreateUser(ctx, newUser); err != nil {
 			return err
 		}
 
-		// TODO: Verification code that is sent should be inserted to the database in the same transaction.
-		// if saving of the verification code fails the whole transaction should rollback because this is the most import part to check if the user's email is valid
-
-		// TODO: another problem is that we should save the the id returned from resend sdk in the database. so we need to fix the er diagram
-		// fix the er diagram before creating the struct for the verification code
+		if err := interactor.authRepository.InsertVerificationCode(ctx, verificationCodeParam); err != nil {
+			return err
+		}
 
 		return nil
 	})
@@ -115,16 +126,26 @@ func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entit
 	return
 }
 
-func (interactor *AuthInteractor) sendEmailWithVerificationCode(ctx context.Context, email string, uuid string, verificationCode string) (resendSendEmailId string, err error) {
+const verificationCodeLifetime = time.Minute
+
+func (interactor *AuthInteractor) sendEmailWithVerificationCode(email string, verificationCode string) (resendSendEmailId string, err error) {
 	logger.Info("AuthInteractor: sendEmailWithVerificationCode")
 	client := resend.NewClient(interactor.resendConfig.APIKey)
 
-	// TODO: need to fix the message we are going to send to the user's over all
+	content, err := emailtemplate.VerificationCode(emailtemplate.VerificationCodeData{
+		Code:         verificationCode,
+		ValidMinutes: int(verificationCodeLifetime.Minutes()),
+	})
+	if err != nil {
+		return "", apperror.Wrap(apperror.InternalError, err)
+	}
+
 	params := &resend.SendEmailRequest{
 		From:    interactor.resendConfig.EmailFrom,
 		To:      []string{email},
-		Html:    "<strong>Hi! This is Nokori.</strong>", // TODO: add the verification code here and in the subject
-		Subject: "Hi this is nokori.",
+		Subject: content.Subject,
+		Html:    content.HTML,
+		Text:    content.Text,
 		ReplyTo: interactor.resendConfig.ReplyTo,
 	}
 

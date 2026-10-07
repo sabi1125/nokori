@@ -6,6 +6,7 @@ import (
 	"backend/internal/domain/interactor"
 	"backend/internal/domain/repository"
 	"backend/internal/tx"
+	"backend/internal/util"
 
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
@@ -20,8 +21,12 @@ func Router(e *echo.Echo, db *gorm.DB) {
 	// config
 	resendConfig := config.LoadResendConfigFromEnv()
 
+	// utils
+	timeProvider := util.NewTimeProvider()
+	uuidGenerator := util.NewUUIDGenerator()
+
 	RegisteredHealthRouter(e, db)
-	RegisteredAuthRouter(e, db, userRepository, resendConfig, txManager)
+	RegisteredAuthRouter(e, db, userRepository, resendConfig, uuidGenerator, timeProvider, txManager)
 }
 
 func RegisteredHealthRouter(e *echo.Echo, db *gorm.DB) {
@@ -38,12 +43,14 @@ func RegisteredAuthRouter(
 	db *gorm.DB,
 	userRepository *repository.UserRepository,
 	resendConfig *config.ResendConfig,
+	uuidGenerator util.UUIDGenerator,
+	timeProvider util.TimeProvider,
 	txManager tx.Manager,
 ) {
 	auth := e.Group("/auth")
 
 	repository := repository.NewAuthRepository(db)
-	interactor := interactor.NewAuthInteractor(repository, userRepository, resendConfig, txManager)
+	interactor := interactor.NewAuthInteractor(repository, userRepository, resendConfig, uuidGenerator, timeProvider, txManager)
 	controller := controller.NewAuthController(interactor)
 
 	auth.POST("/signup", controller.SignUp)
