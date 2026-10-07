@@ -112,17 +112,44 @@ func MiddlewareLogger(logger *zap.Logger) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
 			err := next(c)
+			if err != nil {
+				c.Error(err)
+			}
 
-			logger.Info("Request",
-				zap.String("method", c.Request().Method),
-				zap.String("path", c.Request().URL.Path),
-				zap.String("query", c.Request().URL.RawQuery),
-				zap.Int("status", c.Response().Status),
-				zap.String("client_ip", c.RealIP()),
-				zap.Duration("latency", time.Since(start)),
-			)
+			switch {
+			case c.Response().Status >= 500:
+				logger.Error(
+					"Request",
+					zap.String("method", c.Request().Method),
+					zap.String("path", c.Request().URL.Path),
+					zap.String("query", c.Request().URL.RawQuery),
+					zap.Int("status", c.Response().Status),
+					zap.String("client_ip", c.RealIP()),
+					zap.Duration("latency", time.Since(start)),
+				)
+			case c.Response().Status >= 400:
+				logger.Warn(
+					"Request",
+					zap.String("method", c.Request().Method),
+					zap.String("path", c.Request().URL.Path),
+					zap.String("query", c.Request().URL.RawQuery),
+					zap.Int("status", c.Response().Status),
+					zap.String("client_ip", c.RealIP()),
+					zap.Duration("latency", time.Since(start)),
+				)
+			default:
+				logger.Info(
+					"Request",
+					zap.String("method", c.Request().Method),
+					zap.String("path", c.Request().URL.Path),
+					zap.String("query", c.Request().URL.RawQuery),
+					zap.Int("status", c.Response().Status),
+					zap.String("client_ip", c.RealIP()),
+					zap.Duration("latency", time.Since(start)),
+				)
+			}
 
-			return err
+			return nil
 		}
 	}
 }
