@@ -3,6 +3,7 @@ module backend
 go 1.27.1
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/go-playground/validator/v10 v10.30.5
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1

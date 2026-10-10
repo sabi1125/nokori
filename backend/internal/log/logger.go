@@ -37,7 +37,9 @@ func Init(zapConfig *config.ZapConfig) {
 		ErrorOutputPaths: []string{"stderr"},
 	}
 
-	built, err := zc.Build()
+	// Stack traces only from ERROR up; development mode would otherwise attach
+	// them to every WARN, e.g. each 4xx request line.
+	built, err := zc.Build(zap.AddStacktrace(zapcore.ErrorLevel))
 	if err != nil {
 		panic("failed to build logger: " + err.Error())
 	}

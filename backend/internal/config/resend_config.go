@@ -20,12 +20,12 @@ func LoadResendConfigFromEnv() *ResendConfig {
 	}
 
 	emailFrom := os.Getenv("EMAIL_FROM")
-	if apiKey == "" {
+	if emailFrom == "" {
 		log.Fatal("EMAIL_FROM environment variable is not set")
 	}
 
 	replyTo := os.Getenv("REPLY_TO")
-	if apiKey == "" {
+	if replyTo == "" {
 		log.Fatal("REPLY_TO environment variable is not set")
 	}
 
