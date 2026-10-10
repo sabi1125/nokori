@@ -2,49 +2,47 @@ package interactor
 
 import (
 	"context"
-	"crypto/rand"
-	"math/big"
 	"time"
 
-	"backend/internal/config"
+	api_inputport "backend/internal/domain/api_repository/inputport"
 	"backend/internal/domain/apperror"
 	"backend/internal/domain/entities"
 	"backend/internal/domain/repository/inputport"
-	"backend/internal/emailtemplate"
 	logger "backend/internal/log"
 	"backend/internal/tx"
 	"backend/internal/util"
 
-	"github.com/resend/resend-go/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthInteractor struct {
-	authRepository inputport.AuthRepositoryInputPort
-	userRepository inputport.UserRepositoryInputPort
-	resendConfig   *config.ResendConfig
-	uuidGenerator  util.UUIDGenerator
-	timeProvider   util.TimeProvider
-	txManager      tx.Manager
+	authRepository                 inputport.AuthRepositoryInputPort
+	userRepository                 inputport.UserRepositoryInputPort
+	sendVerificationMailRepository api_inputport.SendVerificationMailInputPort
+	uuidGenerator                  util.UUIDGenerator
+	timeProvider                   util.TimeProvider
+	txManager                      tx.Manager
 }
 
 func NewAuthInteractor(
 	authRepository inputport.AuthRepositoryInputPort,
 	userRepository inputport.UserRepositoryInputPort,
-	resendConfig *config.ResendConfig,
+	sendVerificationMailRepository api_inputport.SendVerificationMailInputPort,
 	uuidGenerator util.UUIDGenerator,
 	timeProvider util.TimeProvider,
 	txManager tx.Manager,
 ) *AuthInteractor {
 	return &AuthInteractor{
-		authRepository: authRepository,
-		userRepository: userRepository,
-		resendConfig:   resendConfig,
-		uuidGenerator:  uuidGenerator,
-		timeProvider:   timeProvider,
-		txManager:      txManager,
+		authRepository:                 authRepository,
+		userRepository:                 userRepository,
+		sendVerificationMailRepository: sendVerificationMailRepository,
+		uuidGenerator:                  uuidGenerator,
+		timeProvider:                   timeProvider,
+		txManager:                      txManager,
 	}
 }
+
+const verificationCodeLifetime = time.Minute
 
 func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entities.SignUp) (err error) {
 	logger.Info("AuthInteractor: SignUp")
@@ -86,12 +84,7 @@ func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entit
 		return apperror.Wrap(apperror.InternalError, err)
 	}
 
-	verificationCode, err := interactor.createVerificationCode()
-	if err != nil {
-		return
-	}
-
-	resendId, err := interactor.sendEmailWithVerificationCode(newUser.Email, verificationCode)
+	resendId, verificationCode, err := interactor.sendVerificationMailRepository.SendEmailWithVerificationCode(newUser.Email)
 	if err != nil {
 		return
 	}
@@ -124,56 +117,4 @@ func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entit
 	}
 
 	return
-}
-
-const verificationCodeLifetime = time.Minute
-
-func (interactor *AuthInteractor) sendEmailWithVerificationCode(email string, verificationCode string) (resendSendEmailId string, err error) {
-	logger.Info("AuthInteractor: sendEmailWithVerificationCode")
-	client := resend.NewClient(interactor.resendConfig.APIKey)
-
-	content, err := emailtemplate.VerificationCode(emailtemplate.VerificationCodeData{
-		Code:         verificationCode,
-		ValidMinutes: int(verificationCodeLifetime.Minutes()),
-	})
-	if err != nil {
-		return "", apperror.Wrap(apperror.InternalError, err)
-	}
-
-	params := &resend.SendEmailRequest{
-		From:    interactor.resendConfig.EmailFrom,
-		To:      []string{email},
-		Subject: content.Subject,
-		Html:    content.HTML,
-		Text:    content.Text,
-		ReplyTo: interactor.resendConfig.ReplyTo,
-	}
-
-	sent, err := client.Emails.Send(params)
-	if err != nil {
-		return "", apperror.Wrap(apperror.ServiceUnavailable, err)
-	}
-
-	resendSendEmailId = sent.Id
-
-	return
-}
-
-func (interactor *AuthInteractor) createVerificationCode() (verificationCode string, err error) {
-	max := big.NewInt(1000000)
-
-	nBig, err := rand.Int(rand.Reader, max)
-	if err != nil {
-		return "", apperror.Wrap(apperror.InternalError, err)
-	}
-
-	num := nBig.Int64()
-	buf := make([]byte, 6)
-
-	for i := 5; i >= 0; i-- {
-		buf[i] = '0' + byte(num%10) // '0' is ASCII 48. Adding the remainder gives the digit character.
-		num /= 10
-	}
-
-	return string(buf), nil
 }

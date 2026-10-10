@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"backend/internal/config"
 	"backend/internal/controller"
+	apirepository "backend/internal/domain/api_repository"
 	"backend/internal/domain/interactor"
 	"backend/internal/domain/repository"
 	"backend/internal/tx"
@@ -50,7 +51,8 @@ func RegisteredAuthRouter(
 	auth := e.Group("/auth")
 
 	repository := repository.NewAuthRepository(db)
-	interactor := interactor.NewAuthInteractor(repository, userRepository, resendConfig, uuidGenerator, timeProvider, txManager)
+	apiRepository := apirepository.NewSendVerificationMailRepository(resendConfig)
+	interactor := interactor.NewAuthInteractor(repository, userRepository, apiRepository, uuidGenerator, timeProvider, txManager)
 	controller := controller.NewAuthController(interactor)
 
 	auth.POST("/signup", controller.SignUp)
