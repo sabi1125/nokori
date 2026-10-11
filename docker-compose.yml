@@ -36,10 +36,18 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+    # Healthy once MySQL accepts TCP connections. 127.0.0.1 (not localhost)
+    # matters: during first-time init MySQL runs a socket-only temp server,
+    # which would otherwise report healthy too early.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-unokori", "-pnokori123"]
+      interval: 2s
+      retries: 30
   backend:
     build: ./backend
     ports:
       - "8080:8080"
+    env_file: ./backend/.env
     environment:
       PORT: "8080"
       ENVIRONMENT: development
@@ -49,8 +57,10 @@ services:
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_NAME: nokori
+    # entrypoint.sh runs migrations first, so MySQL must be ready, not just started.
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
 volumes:
   mysql-data:

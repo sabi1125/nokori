@@ -1,12 +1,25 @@
+//go:generate mockgen -source=$GOFILE -destination=mock/$GOFILE -package=mock
 package tx
 
-import "context"
+import (
+	"context"
 
-// Manager lets a caller run a function inside a single database transaction
-// without that function needing to know about *gorm.DB directly. Lives in
-// its own package so the domain layer (interactors) can depend on this
-// interface without importing internal/infrastructure — same reasoning as
-// the interactor/repository inputport split.
+	"gorm.io/gorm"
+)
+
 type Manager interface {
 	WithinTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+type ctxKey string
+
+const gormTxKey ctxKey = "gorm_tx"
+
+func WithTx(ctx context.Context, db *gorm.DB) context.Context {
+	return context.WithValue(ctx, gormTxKey, db)
+}
+
+func ExtractTx(ctx context.Context) *gorm.DB {
+	db, _ := ctx.Value(gormTxKey).(*gorm.DB)
+	return db
 }

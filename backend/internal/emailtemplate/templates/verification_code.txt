@@ -1,0 +1,9 @@
+Nokori
+
+Enter this code in the app to confirm your email address:
+
+{{.Code}}
+
+The code works for {{.ValidMinutes}} minute{{if ne .ValidMinutes 1}}s{{end}}. If it runs out, tap "Resend code" in the app to get a new one.
+
+If you didn't sign up for Nokori, you can ignore this email.

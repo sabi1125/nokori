@@ -1,6 +1,8 @@
 {
     "language": "golang",
-    "root": "/Users/sabirbarahi/Documents/nokori/backend",
+    "root": "/home/sabir/Documents/nokori/backend",
     "remote": null,
-    "recent_resources": []
+    "recent_resources": [
+        "auth"
+    ]
 }

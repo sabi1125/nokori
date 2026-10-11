@@ -43,6 +43,7 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-10-03 | [OpenAPI spec: split by epic, bundled for Scalar](#api-spec-split) | `open-api/spec/` split into `paths/<epic>.yaml` + `components/`, short descriptive keys; a dev container bundles it into the one file Scalar serves | Decided |
 | 2026-10-04 | [Email verification: send the code at signup](#email-verification-signup) | User row created unverified at signup and the code sent right then; login refused until verified | Decided (supersedes the timing in "Email verification") |
 | 2026-10-04 | [Signup: repeat signups, cleanup, account enumeration](#signup-repeat) | Existing email → 409 with `email_not_verified` or `user_already_exists`, never overwritten; one valid code per user; unverified accounts deleted after 7 days; no deep link; rare edge cases accepted | Decided |
+| 2026-10-08 | [Email sender domain](#email-sender-domain) | Send from `noreply@nokori.dailycodingcompanion.quest` (subdomain of the existing DCC domain), permanently — no separate Nokori domain | Decided |
 
 ---
 
@@ -991,8 +992,10 @@ second attempt:
   - `email_not_verified` → the code entry screen (with resend).
   - `user_already_exists` → login.
 - **One valid code per user at a time.** Resend replaces any existing
-  code with a fresh one. Code lifetime: **not set yet** — decide when
-  speccing verify/resend (#63).
+  code with a fresh one. Code lifetime: **60 seconds** (set 2026-10-07
+  while building signup, #10). Deliberately short: resend is one tap
+  away, and a code that dies fast is useless to anyone who isn't the
+  person signing up right now.
 - **Cleanup:** a periodic job deletes accounts that stay unverified for
   **7 days**, which frees the email to sign up again.
 - **No deep link** in the code email — the user types the code. Avoids
@@ -1010,7 +1013,51 @@ second attempt:
   is blocked until cleanup, or verifies an account with the stranger's
   password and recovers it via password reset. Nothing leaks (the
   account is empty), and there's little motive to do it.
+- **Verification codes are stored in plain text** (added 2026-10-07).
+  Hashing a 6-digit code adds nothing: anyone holding the database can
+  hash all 1,000,000 candidates in under a second. What actually protects
+  a code is the 60-second lifetime and a limit on wrong attempts in the
+  verify step (#63).
 
 These are rare cases on an app with this threat model; a fallback is
 the right answer rather than more machinery.
+
+---
+
+<a id="email-sender-domain"></a>
+## 2026-10-08 — Email sender domain: a subdomain of the DCC domain
+
+**Status:** Decided.
+
+### Context
+
+Resend only delivers to the account owner's own address until a domain
+is verified, so verification codes couldn't reach anyone else. Nokori
+has no domain of its own.
+
+### Options
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Buy a Nokori domain (e.g. `nokori.site`, `getnokori.com`) | Branded sender; reputation separate from DCC. | Recurring cost — the bare names are expensive, and cheap first years often renew high (`nokori.site`: $2, then $65/yr). |
+| **B. Subdomain of the existing DCC domain** ✅ chosen | Free — no new domain. Verified in Resend with records only under `nokori.` (DKIM TXT + two SPF CNAMEs in Railway's DNS), so DCC's site and API records are untouched. | Code emails come from another product's domain; DCC and Nokori share the parent domain's sending reputation. |
+| C. Stay on `onboarding@resend.dev` | No setup. | Can only deliver to the Resend account owner — not usable for anyone else. |
+
+### Decision
+
+Option B, permanently, including once other people use Nokori: codes
+are sent from `noreply@nokori.dailycodingcompanion.quest` (`EMAIL_FROM`
+in `backend/.env`); `REPLY_TO` stays a real inbox. The optional DMARC
+record was deliberately not added — its name sits at the root of the
+domain and would apply to DCC too.
+
+### Rationale
+
+No cost for a personal app, and the sender is a config value, so moving
+to a dedicated domain later is an env change plus new DNS records — no
+code change.
+
+**Revisit if Nokori starts making money** — at that point a dedicated
+Nokori domain (prefer a `.com` with a flat renewal price) is worth the
+recurring cost.
 
