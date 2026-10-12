@@ -22,8 +22,11 @@ rather than guessing:
     contents: every URL listed, each `$ref`-ing a short descriptive key
     in `paths/<epic>.yaml` (`paths/system.yaml` for non-epic endpoints
     like `/health`). Reused pieces live in `components/schemas.yaml`
-    (data shapes, incl. the shared `Error`) and
-    `components/responses.yaml` (whole error responses). `$ref`s resolve
+    (data shapes, incl. the shared `Error`),
+    `components/responses.yaml` (whole error responses) and
+    `components/examples.yaml` (single example bodies, for when one
+    status returns several and lists them under `examples:` — those
+    entries must `$ref` an Example, never a Response). `$ref`s resolve
     relative to the file they're in — from `paths/`, components are
     `../components/...`.
   - `public/` — what nginx serves: `index.html` (Scalar via CDN) and

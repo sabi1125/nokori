@@ -67,17 +67,65 @@ signup:
               $ref: '../components/schemas.yaml#/Error'
             examples:
               UnverifiedEmail:
-                summary: "Provided email has not been verified yet."
-                value:
-                  code: email_not_verified
-                  message: Account for the provided email address has not been verified.
+                $ref: '../components/examples.yaml#/UnverifiedEmail'
               UserAlreadyExists:
-                summary: "Provided email already exists."
-                value:
-                  code: user_already_exists
-                  message: Account for the provided email address is already registered.
+                $ref: '../components/examples.yaml#/UserAlreadyExists'
       '503':
         $ref: '../components/responses.yaml#/ServiceUnavailable'
       '500':
         $ref: '../components/responses.yaml#/InternalError'
-
+verify:
+  post:
+    summary: Verify email
+    description: |
+      Verifies user account with verification code.
+      * Takes verification code and email address.
+        * white spaces will be trimmed for email.
+      * Check if user exists with email address.
+        * If email address does not exist then return with 400(email_not_registered)
+        * If email address exist and if the email is verified return with 409(user_already_exists).
+        * If email address exists and it is not verified get the verification code that exists for the email address.
+      * From the record received from the above check if the verification code is already expired.
+        * If the token has already expired return with 401(token_already_expired)
+        * If the token is still valid compare the given verification code to the verification code stored for that user.
+      * Return 200(Success).
+      
+    operationId: verify
+    tags: [Account]
+    requestBody:
+      description: Parameters required to verify user email.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+              - verification_code
+            properties:
+              email:
+                type: string
+                maxLength: 255
+                example: john@doe.com
+              verification_code:
+                type: string
+                minLength: 6
+                maxLength: 6
+    responses:
+      '200':
+        description: Email has been verified.
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        description: Verification code has expired.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Error'
+            example:
+              code: token_already_expired
+              message: Verification code has expired. Please request a new one.
+      '409':
+        $ref: '../components/responses.yaml#/UserAlreadyExists'
+      '500':
+        $ref: '../components/responses.yaml#/InternalError'

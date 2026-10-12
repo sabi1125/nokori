@@ -31,3 +31,13 @@ InternalError:
       example:
         code: internal_error
         message: Something went wrong. Please wait and try again.
+
+UserAlreadyExists:
+  description: Provided email address is already verified and user already exists.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/Error'
+      examples:
+        UserAlreadyExists:
+          $ref: './examples.yaml#/UserAlreadyExists'
