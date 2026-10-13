@@ -67,17 +67,136 @@ signup:
               $ref: '../components/schemas.yaml#/Error'
             examples:
               UnverifiedEmail:
-                summary: "Provided email has not been verified yet."
-                value:
-                  code: email_not_verified
-                  message: Account for the provided email address has not been verified.
+                $ref: '../components/examples.yaml#/UnverifiedEmail'
               UserAlreadyExists:
-                summary: "Provided email already exists."
-                value:
-                  code: user_already_exists
-                  message: Account for the provided email address is already registered.
+                $ref: '../components/examples.yaml#/UserAlreadyExists'
       '503':
         $ref: '../components/responses.yaml#/ServiceUnavailable'
       '500':
         $ref: '../components/responses.yaml#/InternalError'
+verify:
+  post:
+    summary: Verify email
+    description: |
+      Verifies user account with verification code.
+      * Takes verification code and email address.
+        * white spaces will be trimmed and email address will be converted to lowercase.
+      * Check if user exists with email address.
+        * If email address does not exist then return with 404(email_not_registered)
+        * If email address exist and if the email is verified return with 409(user_already_exists).
+        * If email address exists and it is not verified get the verification code that exists for the email address.
+      * From the record received from the above check if the verification code is still usable.
+        * If the code has expired (60 seconds) or has already been tried 5 times, return with 401(token_already_expired).
+        * Otherwise compare the given verification code to the verification code stored for that user.
+          * If it does not match, count the attempt and return with 400(invalid_verification_code).
+            The 5th wrong attempt invalidates the code; the user has to request a new one via resend.
+      * Return 200(Success).
+      
+    operationId: verify
+    tags: [Account]
+    requestBody:
+      description: Parameters required to verify user email.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+              - verification_code
+            properties:
+              email:
+                type: string
+                maxLength: 255
+                example: john@doe.com
+                format: email
+              verification_code:
+                type: string
+                minLength: 6
+                maxLength: 6
+    responses:
+      '200':
+        description: Email has been verified.
+      '400':
+        description: Parameters are invalid, or the verification code does not match.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Error'
+            examples:
+              InvalidParameters:
+                $ref: '../components/examples.yaml#/InvalidParameters'
+              InvalidVerificationCode:
+                $ref: '../components/examples.yaml#/InvalidVerificationCode'
+      '401':
+        description: Verification code has expired or was invalidated after 5 wrong attempts.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Error'
+            example:
+              code: token_already_expired
+              message: Verification code is no longer valid. Please request a new one.
+      '404':
+        $ref: '../components/responses.yaml#/EmailNotRegistered'
+      '409':
+        $ref: '../components/responses.yaml#/UserAlreadyExists'
+      '500':
+        $ref: '../components/responses.yaml#/InternalError'
+resend:
+  post:
+    summary: Resend
+    description: |
+      Resends new verification code to already registered user.
+      * Takes email address.
+        * white spaces will be trimmed and email address will be converted to lowercase.
+      * Checks if email address is valid email address.
+        * If email address is not a valid email returns 400(invalid_parameters).
+      * Checks if email address is already registered.
+        * If email address is not a registered email address return with 404(email_not_registered).
+        * If email is already registered and verified return with 409(user_already_exists).
+      * If the current verification code was sent less than 60 seconds ago return with 429(resend_too_soon).
+      * Send new verification code (OTP(one time password)) to the email address.
+        * If sending the email fails return with 503(service_unavailable).
+        ※ If this API responds with 503 the frontend is expected to try recalling the same api atleast once(count is a frontend decision).
+      * Update database with the new verification code for the email address.
 
+    operationId: resend
+    tags: [Account]
+    requestBody:
+      description: Parameters required to resend verification code.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+            properties:
+              email:
+                type: string
+                maxLength: 255
+                example: john@doe.com
+                format: email
+    responses:
+      '200':
+        description: Verification code sent.
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '404':
+        $ref: '../components/responses.yaml#/EmailNotRegistered'
+      '409':
+        $ref: '../components/responses.yaml#/UserAlreadyExists'
+      '429':
+        description: A verification code was sent less than 60 seconds ago.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Error'
+            example:
+              code: resend_too_soon
+              message: Please wait a minute before requesting a new code.
+      '503':
+        $ref: '../components/responses.yaml#/ServiceUnavailable'
+      '500':
+        $ref: '../components/responses.yaml#/InternalError'

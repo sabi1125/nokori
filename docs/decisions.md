@@ -44,6 +44,7 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-10-04 | [Email verification: send the code at signup](#email-verification-signup) | User row created unverified at signup and the code sent right then; login refused until verified | Decided (supersedes the timing in "Email verification") |
 | 2026-10-04 | [Signup: repeat signups, cleanup, account enumeration](#signup-repeat) | Existing email → 409 with `email_not_verified` or `user_already_exists`, never overwritten; one valid code per user; unverified accounts deleted after 7 days; no deep link; rare edge cases accepted | Decided |
 | 2026-10-08 | [Email sender domain](#email-sender-domain) | Send from `noreply@nokori.dailycodingcompanion.quest` (subdomain of the existing DCC domain), permanently — no separate Nokori domain | Decided |
+| 2026-10-13 | [Verification code: attempt limit and resend limit](#verification-limits) | 5 wrong attempts invalidate a code (new `attempts` column); resend at most once per 60 seconds per user | Decided |
 
 ---
 
@@ -1061,3 +1062,47 @@ code change.
 Nokori domain (prefer a `.com` with a flat renewal price) is worth the
 recurring cost.
 
+
+---
+
+<a id="verification-limits"></a>
+## 2026-10-13 — Verification code: attempt limit and resend limit
+
+**Status:** Decided. Settles the "limit on wrong attempts in the verify
+step" left open in [Signup: repeat signups…](#signup-repeat); came out
+of the verify/resend spec (#63).
+
+### Context
+
+Verify takes `{ email, code }` and a code is 6 digits that live 60
+seconds. With no limit on wrong guesses, an attacker can guess as fast
+as the server answers for each code's whole lifetime — at ~50
+requests/second that's ~3,000 guesses per code (~0.3% per minute), so a
+hit within hours. Resend separately needs a limit, or anyone can flood
+an inbox and burn the Resend free tier (3,000 emails/month).
+
+### Options (attempt limit)
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. No counter; rely on the 60-second lifetime + resend limit | No migration. | Guessing is still feasible within hours, as above. |
+| B. Invalidate the code on the first wrong guess | No migration (just delete the row). | One typo forces a resend and a wait of up to a minute. |
+| **C. Count wrong attempts; invalidate the code after 5** ✅ chosen | Typos are fine; guessing drops to ~1 success per 200,000 minutes. | Needs an `attempts` column on `verification_codes` (new migration). |
+
+### Decision
+
+- **Verify:** a wrong code returns `400 invalid_verification_code` and
+  counts an attempt. The 5th wrong attempt invalidates the code. An
+  expired or invalidated code returns `401 token_already_expired` — the
+  client sends the user to resend either way.
+- **Resend:** at most once per 60 seconds per user, checked against
+  `verification_codes.created_at` (no migration). Too early returns
+  `429 resend_too_soon`. Since codes also live 60 seconds, this means a
+  new code is only issued once the previous one has expired.
+
+### Rationale
+
+Five attempts plus the resend limit caps a guesser at 5 guesses a
+minute per account, which makes guessing pointless while leaving room
+for typos. Tying resend to the code's lifetime keeps one rule for the
+client: wait for the timer, then resend.

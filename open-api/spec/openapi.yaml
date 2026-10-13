@@ -24,3 +24,7 @@ paths:
     $ref: './paths/system.yaml#/health'
   /auth/signup:
     $ref: './paths/account.yaml#/signup'
+  /auth/verify:
+    $ref: './paths/account.yaml#/verify'
+  /auth/resend:
+    $ref: './paths/account.yaml#/resend'

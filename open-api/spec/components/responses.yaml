@@ -3,14 +3,14 @@
 # top-level key per response.
 
 ServiceUnavailable:
-  description: A dependency (e.g. the database) is unreachable.
+  description: Some of the external services being used are unreachable.
   content:
     application/json:
       schema:
         $ref: './schemas.yaml#/Error'
       example:
         code: service_unavailable
-        message: Database is unreachable.
+        message: Some services are unreachable.
 
 BadRequest:
   description: Parameters given for request are invalid.
@@ -31,3 +31,22 @@ InternalError:
       example:
         code: internal_error
         message: Something went wrong. Please wait and try again.
+
+UserAlreadyExists:
+  description: Provided email address is already verified and user already exists.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/Error'
+      examples:
+        UserAlreadyExists:
+          $ref: './examples.yaml#/UserAlreadyExists'
+EmailNotRegistered:
+  description: Provided email address is not a registered email address.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/Error'
+      examples:
+        EmailNotRegistered:
+          $ref: './examples.yaml#/EmailNotRegistered'

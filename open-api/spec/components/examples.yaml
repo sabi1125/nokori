@@ -1,0 +1,33 @@
+# Example bodies reused across endpoints (summary + value). Used where
+# one status can return several bodies (`examples:` entries must be
+# Examples, not Responses). One top-level key per example.
+
+UnverifiedEmail:
+  summary: Provided email has not been verified yet.
+  value:
+    code: email_not_verified
+    message: Account for the provided email address has not been verified.
+
+UserAlreadyExists:
+  summary: Provided email already exists.
+  value:
+    code: user_already_exists
+    message: Account for the provided email address is already registered.
+
+EmailNotRegistered:
+  summary: Provided email address does not exist.
+  value:
+    code: email_not_registered
+    message: Provided email address is not a registered email address.
+
+InvalidParameters:
+  summary: Request includes invalid parameters.
+  value:
+    code: invalid_parameters
+    message: Request includes invalid parameters.
+
+InvalidVerificationCode:
+  summary: Verification code does not match.
+  value:
+    code: invalid_verification_code
+    message: Verification code is incorrect.
