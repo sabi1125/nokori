@@ -41,3 +41,12 @@ UserAlreadyExists:
       examples:
         UserAlreadyExists:
           $ref: './examples.yaml#/UserAlreadyExists'
+EmailNotRegistered:
+  description: Provided email address is not a registered email address.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/Error'
+      examples:
+        EmailNotRegistered:
+          $ref: './examples.yaml#/EmailNotRegistered'
