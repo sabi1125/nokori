@@ -56,4 +56,5 @@ func RegisteredAuthRouter(
 	controller := controller.NewAuthController(interactor)
 
 	auth.POST("/signup", controller.SignUp)
+	auth.POST("/vefify", controller.Verify)
 }

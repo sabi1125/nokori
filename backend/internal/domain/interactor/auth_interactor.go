@@ -118,3 +118,7 @@ func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entit
 
 	return
 }
+
+func (interactor *AuthInteractor) VefrifyCode(ctx context.Context, verificationRequestParams entities.VerificationRequest) (err error) {
+	return
+}
