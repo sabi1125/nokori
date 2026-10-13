@@ -80,7 +80,7 @@ verify:
     description: |
       Verifies user account with verification code.
       * Takes verification code and email address.
-        * white spaces will be trimmed for email.
+        * white spaces will be trimmed and email address will be converted to lowercase.
       * Check if user exists with email address.
         * If email address does not exist then return with 404(email_not_registered)
         * If email address exist and if the email is verified return with 409(user_already_exists).
@@ -109,6 +109,7 @@ verify:
                 type: string
                 maxLength: 255
                 example: john@doe.com
+                format: email
               verification_code:
                 type: string
                 minLength: 6
@@ -148,14 +149,17 @@ resend:
     description: |
       Resends new verification code to already registered user.
       * Takes email address.
-        * Checks if email address is valid email address.
-          * If email address is not a valid email returns 400(invalid_parameters).
-        * Checks if email address is already registered.
-          * If email address is not a registered email address return with 404(email_not_registered).
-          * If email is already registered and verified return with 409(user_already_exists).
+        * white spaces will be trimmed and email address will be converted to lowercase.
+      * Checks if email address is valid email address.
+        * If email address is not a valid email returns 400(invalid_parameters).
+      * Checks if email address is already registered.
+        * If email address is not a registered email address return with 404(email_not_registered).
+        * If email is already registered and verified return with 409(user_already_exists).
       * If the current verification code was sent less than 60 seconds ago return with 429(resend_too_soon).
-      * Replace any existing verification code with a new one and send it (OTP(one time password)) to the email address.
+      * Send new verification code (OTP(one time password)) to the email address.
         * If sending the email fails return with 503(service_unavailable).
+        ※ If this API responds with 503 the frontend is expected to try recalling the same api atleast once(count is a frontend decision).
+      * Update database with the new verification code for the email address.
 
     operationId: resend
     tags: [Account]
@@ -173,6 +177,7 @@ resend:
                 type: string
                 maxLength: 255
                 example: john@doe.com
+                format: email
     responses:
       '200':
         description: Verification code sent.
