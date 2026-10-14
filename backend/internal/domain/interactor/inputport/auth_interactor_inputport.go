@@ -9,5 +9,5 @@ import (
 
 type AuthInteractorInputPort interface {
 	SignUp(ctx context.Context, signupParams entities.SignUp) (err error)
-	VefrifyCode(ctx context.Context, verificationRequestParams entities.VerificationRequest) (err error)
+	VerifyCode(ctx context.Context, verificationRequestParams entities.VerificationRequest) (err error)
 }

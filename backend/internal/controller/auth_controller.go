@@ -74,7 +74,7 @@ func (controller *AuthController) Verify(c echo.Context) (err error) {
 		return apperror.Wrap(apperror.InvalidParameter, err)
 	}
 
-	err = controller.authInteractor.VefrifyCode(ctx, verificationRequestParam)
+	err = controller.authInteractor.VerifyCode(ctx, verificationRequestParam)
 	if err != nil {
 		return
 	}
