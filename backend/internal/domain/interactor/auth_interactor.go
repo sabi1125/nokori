@@ -160,7 +160,7 @@ func (interactor *AuthInteractor) VerifyCode(ctx context.Context, verificationRe
 		if err := interactor.authRepository.UpdateVerificationCodeAttempts(ctx, verificationCodes.VerificationCodeId, verificationCodes.Attempts+1); err != nil {
 			return err
 		}
-		return apperror.Wrap(apperror.InvalidVerificationCode, err)
+		return new(apperror.InvalidVerificationCode)
 	}
 
 	// changing the verification status of the user to true

@@ -282,3 +282,187 @@ func TestAuthController_SignUp(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthController_Verify(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		mockSetup    func(m *interactorMock.MockAuthInteractorInputPort)
+		expectedCode string
+	}{
+		{
+			name: "success",
+			body: `{"email":"example@email.com", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "example@email.com",
+					VerificationCode: "123456",
+				}).Return(nil)
+			},
+			expectedCode: "",
+		},
+		{
+			name:         "fail when verification code is not numbers",
+			body:         `{"email":"example@email.com", "verification_code":"abcdef"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when verification code is shorter that 6",
+			body:         `{"email":"example@email.com", "verification_code":"12345"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when verification code is longer that 6",
+			body:         `{"email":"example@email.com", "verification_code":"1234567"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name: "success when email is 255chars",
+			body: `{"email":"sabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabir@gmail.com", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "sabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabir@gmail.com",
+					VerificationCode: "123456",
+				}).Return(nil)
+			},
+			expectedCode: "",
+		},
+		{
+			name:         "fail when email is longer than 255chars",
+			body:         `{"email":"sabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabir@gmail.com", "verification_code":"123456"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name: "fails with internal error",
+			body: `{"email":"example@email.com", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "example@email.com",
+					VerificationCode: "123456",
+				}).Return(apperror.Wrap(apperror.InternalError, errors.New("internal_error")))
+			},
+			expectedCode: apperror.InternalError.Code,
+		},
+		{
+			name: "fails when email is not a registered email",
+			body: `{"email":"example@email.com", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "example@email.com",
+					VerificationCode: "123456",
+				}).Return(new(apperror.EmailNotRegistered))
+			},
+			expectedCode: apperror.EmailNotRegistered.Code,
+		},
+		{
+			name: "fails when user already registered and verified",
+			body: `{"email":"example@email.com", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "example@email.com",
+					VerificationCode: "123456",
+				}).Return(new(apperror.UserAlreadyExists))
+			},
+			expectedCode: apperror.UserAlreadyExists.Code,
+		},
+		{
+			name: "fails when verification code is expired",
+			body: `{"email":"example@email.com", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "example@email.com",
+					VerificationCode: "123456",
+				}).Return(new(apperror.TokenAlreadyExpired))
+			},
+			expectedCode: apperror.TokenAlreadyExpired.Code,
+		},
+		{
+			name: "fails when verification code is invalid",
+			body: `{"email":"example@email.com", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "example@email.com",
+					VerificationCode: "123456",
+				}).Return(new(apperror.InvalidVerificationCode))
+			},
+			expectedCode: apperror.InvalidVerificationCode.Code,
+		},
+		{
+			name: "fails when too many attempts",
+			body: `{"email":"example@email.com", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "example@email.com",
+					VerificationCode: "123456",
+				}).Return(new(apperror.TooManyAttempts))
+			},
+			expectedCode: apperror.TooManyAttempts.Code,
+		},
+		{
+			name: "success with email trimmed and lowercased",
+			body: `{"email":"  Example@Email.com ", "verification_code":"123456"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().VerifyCode(gomock.Any(), entities.VerificationRequest{
+					Email:            "example@email.com",
+					VerificationCode: "123456",
+				}).Return(nil)
+			},
+			expectedCode: "",
+		},
+		{
+			name:         "fail when email is not a valid email",
+			body:         `{"email":"not-an-email", "verification_code":"123456"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when email is missing",
+			body:         `{"verification_code":"123456"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when verification code is missing",
+			body:         `{"email":"example@email.com"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when body is malformed json",
+			body:         `{"email":`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAuthInteractor := interactorMock.NewMockAuthInteractorInputPort(ctrl)
+			tt.mockSetup(mockAuthInteractor)
+
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodPost, "/auth/verify", strings.NewReader(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			controller := NewAuthController(mockAuthInteractor)
+
+			err := controller.Verify(c)
+
+			if tt.expectedCode == "" {
+				assert.NoError(t, err)
+			} else {
+				appErr, ok := errors.AsType[*apperror.AppError](err)
+				assert.True(t, ok)
+				assert.Equal(t, tt.expectedCode, appErr.Code)
+			}
+		})
+	}
+}
