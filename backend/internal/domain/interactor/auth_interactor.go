@@ -141,17 +141,17 @@ func (interactor *AuthInteractor) VerifyCode(ctx context.Context, verificationRe
 		return
 	}
 
-	beforeExpiry := verificationCodes.ExpiresAt.Before(interactor.timeProvider.Now())
-	if beforeExpiry {
-		return new(apperror.TokenAlreadyExpired)
-	}
-
 	// TODO: parallel requests for the same user can all read the same attempts value
 	// before any of them increments it, so a burst can get more than 5 guesses.
 	// fix later by locking the row (SELECT ... FOR UPDATE) or by incrementing
 	// with a single conditional UPDATE (WHERE attempts < 5) before comparing.
 	if verificationCodes.Attempts >= 5 {
 		return new(apperror.TooManyAttempts)
+	}
+
+	beforeExpiry := verificationCodes.ExpiresAt.Before(interactor.timeProvider.Now())
+	if beforeExpiry {
+		return new(apperror.TokenAlreadyExpired)
 	}
 
 	// comparing hashed verification code and the verification code sent by the user

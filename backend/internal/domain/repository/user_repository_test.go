@@ -162,6 +162,52 @@ func TestUserRepository_FindUserByEmail(t *testing.T) {
 	}
 }
 
+func TestUserRepository_UpdateUserVerification(t *testing.T) {
+	const userId = "01a116b7-9857-72d0-8afc-4cd265f71b25"
+
+	tests := []struct {
+		name        string
+		setupMock   func(mock sqlmock.Sqlmock)
+		wantErrCode string
+	}{
+		{
+			name: "updates successfully",
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin()
+				mock.ExpectExec(regexp.QuoteMeta("UPDATE `users` SET `verified`=? WHERE user_id = ?")).
+					WithArgs(true, userId).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectCommit()
+			},
+		},
+		{
+			name: "returns internal error when update fails",
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin()
+				mock.ExpectExec(regexp.QuoteMeta("UPDATE `users` SET `verified`=? WHERE user_id = ?")).
+					WillReturnError(errors.New("db connection lost"))
+				mock.ExpectRollback()
+			},
+			wantErrCode: apperror.InternalError.Code,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, cleanup := setupMockDB(t)
+			defer cleanup()
+
+			tt.setupMock(mock)
+
+			repo := NewUserRepository(db)
+			err := repo.UpdateUserVerification(context.Background(), userId, true)
+
+			assertAppErrCode(t, tt.wantErrCode, err)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 // assertAppErrCode checks err is nil when wantCode is empty, otherwise that
 // it's an AppError with that code.
 func assertAppErrCode(t *testing.T, wantCode string, err error) {
