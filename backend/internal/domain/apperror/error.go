@@ -9,7 +9,7 @@ var (
 	InternalError           = AppError{Code: "internal_error", Status: http.StatusInternalServerError, Message: "Something went wrong. Please wait and try again."}
 	ServiceUnavailable      = AppError{Code: "service_unavailable", Status: http.StatusServiceUnavailable, Message: "Some services are unreachable."}
 	EmailNotRegistered      = AppError{Code: "email_not_registered", Status: http.StatusNotFound, Message: "Provided email address is not a registered email address."}
-	TokenAlreadyExpired     = AppError{Code: "token_already_expired", Status: http.StatusUnauthorized, Message: "Verification code is no longer valid. Please request a new one."}
+	TokenAlreadyExpired     = AppError{Code: "token_already_expired", Status: http.StatusUnauthorized, Message: "Verification code has expired. Please request a new one."}
 	InvalidVerificationCode = AppError{Code: "invalid_verification_code", Status: http.StatusBadRequest, Message: "Verification code is incorrect."}
 	TooManyAttempts         = AppError{Code: "too_many_attempts", Status: http.StatusTooManyRequests, Message: "Too many wrong attempts. Please request a new code."}
 )

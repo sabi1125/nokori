@@ -1100,6 +1100,12 @@ an inbox and burn the Resend free tier (3,000 emails/month).
   `429 resend_too_soon`. Since codes also live 60 seconds, this means a
   new code is only issued once the previous one has expired.
 
+**Update (2026-10-17, #57):** a code with 5 wrong attempts now returns
+`429 too_many_attempts` instead of `401 token_already_expired`. The code
+hasn't expired, so the expired error said something false, and the
+client couldn't tell the two apart. `401 token_already_expired` now means
+expiry only. The client still sends the user to resend for both.
+
 ### Rationale
 
 Five attempts plus the resend limit caps a guesser at 5 guesses a
