@@ -56,3 +56,28 @@ func trimSpaces(param *entities.SignUp) entities.SignUp {
 
 	return *param
 }
+
+func (controller *AuthController) Verify(c echo.Context) (err error) {
+	logger.Info("AuthController: Verify")
+
+	ctx := c.Request().Context()
+
+	var verificationRequestParam entities.VerificationRequest
+	if err := c.Bind(&verificationRequestParam); err != nil {
+		return apperror.Wrap(apperror.InvalidParameter, err)
+	}
+
+	// trim white spaces and change email to lowercase
+	verificationRequestParam.Email = strings.ToLower(strings.TrimSpace(verificationRequestParam.Email))
+
+	if err := validator.ValidateStruct(verificationRequestParam); err != nil {
+		return apperror.Wrap(apperror.InvalidParameter, err)
+	}
+
+	err = controller.authInteractor.VerifyCode(ctx, verificationRequestParam)
+	if err != nil {
+		return
+	}
+
+	return c.NoContent(http.StatusOK)
+}

@@ -6,3 +6,8 @@ type SignUp struct {
 	Email     string `json:"email" validate:"required,max=255,email"`
 	Password  string `json:"password" validate:"required,min=8,max=72,printascii"`
 }
+
+type VerificationRequest struct {
+	Email            string `json:"email" validate:"required,max=255,email"`
+	VerificationCode string `json:"verification_code" validate:"required,min=6,max=6,number"`
+}

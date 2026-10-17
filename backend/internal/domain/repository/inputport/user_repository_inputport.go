@@ -9,4 +9,5 @@ import (
 type UserRepositoryInputPort interface {
 	CreateUser(ctx context.Context, user entities.Users) (err error)
 	FindUserByEmail(ctx context.Context, email string) (user entities.Users, err error)
+	UpdateUserVerification(ctx context.Context, userId string, verification bool) (err error)
 }

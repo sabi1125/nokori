@@ -319,3 +319,170 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthInteractor_VerifyCode(t *testing.T) {
+	ctx := context.Background()
+	testFixedTime := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC).Add(10 * time.Minute)
+	testVerificationCode := entities.VerificationCodes{
+		VerificationCodeId: "f3354e2b-8205-4de3-a708-f230b3fba168",
+		Code:               "123456",
+		ResendEmailId:      "621a0b3c-b04a-40d3-ba65-dfd0b8f8c62a",
+		Attempts:           0,
+		ExpiresAt:          testFixedTime,
+	}
+	testInvalidVerificationCode := entities.VerificationCodes{
+		VerificationCodeId: "f3354e2b-8205-4de3-a708-f230b3fba168",
+		Code:               "133456",
+		ResendEmailId:      "621a0b3c-b04a-40d3-ba65-dfd0b8f8c62a",
+		Attempts:           0,
+		ExpiresAt:          testFixedTime,
+	}
+
+	testVerificationRequest := entities.VerificationRequest{
+		Email:            "example@email.com",
+		VerificationCode: "123456",
+	}
+
+	testUser := entities.Users{
+		UserID:       "771f9087-6a77-4405-84ea-b1c34ef7a952",
+		FirstName:    "sabir",
+		LastName:     "barahi",
+		Email:        "example@email.com",
+		PasswordHash: "hashedpassword",
+		Verified:     false,
+	}
+
+	tests := []struct {
+		name        string
+		prepareFunc func(
+			mar *inputportMock.MockAuthRepositoryInputPort,
+			mur *inputportMock.MockUserRepositoryInputPort,
+			msve *apiInputportMock.MockSendVerificationMailInputPort,
+			mUUID *utilMock.MockUUIDGenerator,
+			mTime *utilMock.MockTimeProvider,
+		)
+		wantedError string
+	}{
+		{
+			name: "success",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(testUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testUser.UserID).Return(testVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testFixedTime)
+				mur.EXPECT().UpdateUserVerification(ctx, testUser.UserID, true).Return(nil)
+			},
+		},
+		{
+			name: "when FindUserByEmail returns error",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(entities.Users{}, apperror.Wrap(apperror.InternalError, errors.New("internal_error")))
+			},
+			wantedError: apperror.InternalError.Code,
+		},
+		{
+			name: "when email is empty",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(entities.Users{
+					Email: "",
+				}, nil)
+			},
+			wantedError: apperror.EmailNotRegistered.Code,
+		},
+		{
+			name: "when verified user already exists",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(entities.Users{
+					Email:    "example@email.com",
+					Verified: true,
+				}, nil)
+			},
+			wantedError: apperror.UserAlreadyExists.Code,
+		},
+		{
+			name: "when code already expired",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(testUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testUser.UserID).Return(testVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testFixedTime.Add(time.Second))
+			},
+			wantedError: apperror.TokenAlreadyExpired.Code,
+		},
+		{
+			name: "when attempts is 5 times",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(testUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testUser.UserID).Return(entities.VerificationCodes{
+					Attempts: 5,
+				}, nil)
+			},
+			wantedError: apperror.TooManyAttempts.Code,
+		},
+		{
+			name: "when code already expired",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(testUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testUser.UserID).Return(testInvalidVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testFixedTime)
+				mar.EXPECT().UpdateVerificationCodeAttempts(ctx, testInvalidVerificationCode.VerificationCodeId, testInvalidVerificationCode.Attempts+1).Return(nil)
+			},
+			wantedError: apperror.InvalidVerificationCode.Code,
+		},
+		{
+			name: "when GetVerifiationCodeByEmail returns error",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(testUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testUser.UserID).Return(entities.VerificationCodes{}, apperror.Wrap(apperror.InternalError, errors.New("internal_error")))
+			},
+			wantedError: apperror.InternalError.Code,
+		},
+		{
+			name: "when UpdateVerificationCodeAttempts returns error",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(testUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testUser.UserID).Return(testInvalidVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testFixedTime)
+				mar.EXPECT().UpdateVerificationCodeAttempts(ctx, testInvalidVerificationCode.VerificationCodeId, testInvalidVerificationCode.Attempts+1).Return(apperror.Wrap(apperror.InternalError, errors.New("internal_error")))
+			},
+			wantedError: apperror.InternalError.Code,
+		},
+		{
+			name: "when UpdateUserVerification returns error",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testVerificationRequest.Email).Return(testUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testUser.UserID).Return(testVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testFixedTime)
+				mur.EXPECT().UpdateUserVerification(ctx, testUser.UserID, true).Return(apperror.Wrap(apperror.InternalError, errors.New("internal_error")))
+			},
+			wantedError: apperror.InternalError.Code,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAuthRepository := inputportMock.NewMockAuthRepositoryInputPort(ctrl)
+			mockUserRepository := inputportMock.NewMockUserRepositoryInputPort(ctrl)
+			mockSendVerificationMailRepository := apiInputportMock.NewMockSendVerificationMailInputPort(ctrl)
+			mockUUID := utilMock.NewMockUUIDGenerator(ctrl)
+			mockTimeProvider := utilMock.NewMockTimeProvider(ctrl)
+			mockTx := txMock.NewMockManager(ctrl)
+			mockWithinTransaction(mockTx)
+
+			tt.prepareFunc(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockUUID, mockTimeProvider)
+
+			interactor := NewAuthInteractor(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockUUID, mockTimeProvider, mockTx)
+
+			err := interactor.VerifyCode(ctx, testVerificationRequest)
+
+			if tt.wantedError == "" {
+				assert.NoError(t, err)
+			} else {
+				appErr, ok := errors.AsType[*apperror.AppError](err)
+				assert.True(t, ok)
+				assert.Equal(t, tt.wantedError, appErr.Code)
+			}
+		})
+	}
+}

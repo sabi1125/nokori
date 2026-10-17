@@ -34,3 +34,31 @@ func (repository *AuthRepository) InsertVerificationCode(ctx context.Context, ve
 	}
 	return
 }
+
+func (repository *AuthRepository) GetVerifiationCodeByEmail(ctx context.Context, userId string) (verificationCodes entities.VerificationCodes, err error) {
+	logger.Info("AuthRepository: GetVerification")
+	db := tx.ExtractTx(ctx)
+	if db == nil {
+		db = repository.db
+	}
+
+	if err = db.Where("user_id = ?", userId).Take(&verificationCodes).Error; err != nil {
+		err = apperror.Wrap(apperror.InternalError, err)
+		return
+	}
+	return
+}
+
+func (repository *AuthRepository) UpdateVerificationCodeAttempts(ctx context.Context, verificationCodeId string, attempts int) (err error) {
+	logger.Info("AuthRepository: UpdateVerificationCodeAttempts")
+	db := tx.ExtractTx(ctx)
+	if db == nil {
+		db = repository.db
+	}
+
+	if err = db.Model(&entities.VerificationCodes{}).Where("verification_code_id = ?", verificationCodeId).Update("attempts", attempts).Error; err != nil {
+		err = apperror.Wrap(apperror.InternalError, err)
+		return
+	}
+	return
+}

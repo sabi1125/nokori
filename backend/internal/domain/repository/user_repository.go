@@ -56,3 +56,16 @@ func (repository *UserRepository) FindUserByEmail(ctx context.Context, email str
 	}
 	return
 }
+
+func (repository *UserRepository) UpdateUserVerification(ctx context.Context, userId string, verification bool) (err error) {
+	logger.Info("UserRepository: UpdateUserVerification")
+	db := tx.ExtractTx(ctx)
+	if db == nil {
+		db = repository.db
+	}
+	if err = db.Model(&entities.Users{}).Where("user_id = ?", userId).Update("verified", verification).Error; err != nil {
+		return apperror.Wrap(apperror.InternalError, err)
+	}
+
+	return
+}
