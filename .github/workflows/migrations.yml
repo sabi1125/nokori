@@ -1,0 +1,39 @@
+name: migrations-ci
+on:
+  pull_request:
+    paths:
+      - 'backend/migrations/**'
+      - '.github/workflows/migrations.yml'
+
+jobs:
+  up-down-up:
+    runs-on: ubuntu-latest
+    services:
+      # throwaway database for this run only, deleted with the machine
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: nokori
+        ports:
+          - 3306:3306
+        # wait until MySQL accepts TCP connections before running the steps
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=2s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      # same migrate version and mysql driver tag as backend/Dockerfile
+      - name: Install migrate
+        run: go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.20.1
+      - name: Up, down, up
+        run: |
+          DB='mysql://root@tcp(127.0.0.1:3306)/nokori'
+          migrate -path backend/migrations -database "$DB" up
+          migrate -path backend/migrations -database "$DB" down -all
+          migrate -path backend/migrations -database "$DB" up
