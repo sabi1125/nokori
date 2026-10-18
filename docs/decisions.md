@@ -1189,3 +1189,20 @@ These three cover what has actually broken so far (stale mocks failing
 the build, broken `$ref`s in the spec) plus the one failure that would
 be hardest to undo (a bad migration on production), with as little
 setup as possible.
+
+**Update (2026-10-18, #92):** what the backend coverage number
+measures. The plain `go test ./...` total (42.7% at the time) was
+misleading: generated mocks counted as untested code, glue code dragged
+it down, and code tested only through another package (e.g. the
+validator, fully exercised by the controller tests) showed 0%.
+
+- Coverage runs over `internal/` only (so `cmd/` is out), excluding
+  `mock`, `log`, `infrastructure`, `apperror` and `util`. These are
+  generated mocks or thin wrappers (zap logger, router/DB setup, error
+  types, time/UUID providers) whose coverage says nothing about the
+  app's logic. One known gap hides with them:
+  `infrastructure/error_handler.go` (AppError → HTTP response) has no
+  tests.
+- It uses `-coverpkg` over that same package list, so indirect coverage
+  counts. The total was 78.7% at the time.
+- The job summary shows the per-file table plus the total.

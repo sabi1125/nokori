@@ -1,0 +1,51 @@
+name: backend-ci
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+defaults:
+  run:
+    working-directory: ./backend
+
+jobs:
+  vet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+      - run: go vet ./...
+
+  unitTest-and-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.13.0
+      - name: Test with coverage
+        run: |
+          EXCLUDE='/mock|/log|/infrastructure|/apperror|/util'
+          gotestsum --format testname -- -race -count=1 -shuffle=on \
+            -coverpkg=$(go list ./internal/... | grep -v -E "$EXCLUDE" | paste -sd, -) \
+            -coverprofile=/tmp/cover.out \
+            ./...
+      - name: Coverage summary
+        run: |
+          echo "## Coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=/tmp/cover.out >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+      - run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o build/nokori ./cmd/backend
