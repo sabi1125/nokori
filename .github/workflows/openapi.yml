@@ -1,0 +1,33 @@
+name: openapi-ci
+on:
+  pull_request:
+    paths: 
+      - 'open-api/**'
+      - '.github/workflows/openapi.yml'
+defaults:
+  run:
+    working-directory: ./open-api
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: |
+          npm install -g @redocly/cli@2.64.1
+          redocly lint spec/openapi.yaml --format=github-actions
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: |
+          npm install -g @redocly/cli@2.64.1
+          redocly bundle spec/openapi.yaml --output dist/openapi-combined.yaml
