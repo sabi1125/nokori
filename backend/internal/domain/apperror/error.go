@@ -12,4 +12,5 @@ var (
 	TokenAlreadyExpired     = AppError{Code: "token_already_expired", Status: http.StatusUnauthorized, Message: "Verification code has expired. Please request a new one."}
 	InvalidVerificationCode = AppError{Code: "invalid_verification_code", Status: http.StatusBadRequest, Message: "Verification code is incorrect."}
 	TooManyAttempts         = AppError{Code: "too_many_attempts", Status: http.StatusTooManyRequests, Message: "Too many wrong attempts. Please request a new code."}
+	ResendTooSoon           = AppError{Code: "resend_too_soon", Status: http.StatusTooManyRequests, Message: "Please wait a minute before requesting a new code."}
 )

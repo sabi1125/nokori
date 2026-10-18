@@ -178,3 +178,59 @@ func TestAuthRepository_UpdateVerificationCodeAttempts(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthRepository_UpdateVerificationCodeByVerificationCodeId(t *testing.T) {
+	testCode := entities.VerificationCodes{
+		VerificationCodeId: "5fb7436d-b021-43cc-9dbf-231b2169164a",
+		UserId:             "f79a7721-f7a4-441c-9136-a4db768c9bc3",
+		Code:               "121245",
+		ResendEmailId:      "c5fd626d-4b1d-4092-a651-e367174a8edd",
+		Attempts:           0,
+		ExpiresAt:          time.Date(2026, 10, 10, 12, 1, 0, 0, time.UTC),
+	}
+
+	const updateQuery = "UPDATE `verification_codes` SET `code`=?,`resend_email_id`=?,`attempts`=?,`expires_at`=? WHERE verification_code_id = ?"
+
+	tests := []struct {
+		name        string
+		setupMock   func(mock sqlmock.Sqlmock)
+		wantErrCode string
+	}{
+		{
+			// attempts is 0 here on purpose: without Select, Updates(struct) would skip it
+			name: "updates successfully including zero attempts",
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin()
+				mock.ExpectExec(regexp.QuoteMeta(updateQuery)).
+					WithArgs(testCode.Code, testCode.ResendEmailId, testCode.Attempts, testCode.ExpiresAt, testCode.VerificationCodeId).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectCommit()
+			},
+		},
+		{
+			name: "returns internal error when update fails",
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectBegin()
+				mock.ExpectExec(regexp.QuoteMeta(updateQuery)).
+					WillReturnError(errors.New("db connection lost"))
+				mock.ExpectRollback()
+			},
+			wantErrCode: apperror.InternalError.Code,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, cleanup := setupMockDB(t)
+			defer cleanup()
+
+			tt.setupMock(mock)
+
+			repo := NewAuthRepository(db)
+			err := repo.UpdateVerificationCodeByVerificationCodeId(context.Background(), testCode)
+
+			assertAppErrCode(t, tt.wantErrCode, err)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}

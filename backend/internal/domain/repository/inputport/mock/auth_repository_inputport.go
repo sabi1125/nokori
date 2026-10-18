@@ -83,3 +83,17 @@ func (mr *MockAuthRepositoryInputPortMockRecorder) UpdateVerificationCodeAttempt
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateVerificationCodeAttempts", reflect.TypeOf((*MockAuthRepositoryInputPort)(nil).UpdateVerificationCodeAttempts), ctx, verificationCodeId, attempts)
 }
+
+// UpdateVerificationCodeByVerificationCodeId mocks base method.
+func (m *MockAuthRepositoryInputPort) UpdateVerificationCodeByVerificationCodeId(ctx context.Context, verificationCode entities.VerificationCodes) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateVerificationCodeByVerificationCodeId", ctx, verificationCode)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateVerificationCodeByVerificationCodeId indicates an expected call of UpdateVerificationCodeByVerificationCodeId.
+func (mr *MockAuthRepositoryInputPortMockRecorder) UpdateVerificationCodeByVerificationCodeId(ctx, verificationCode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateVerificationCodeByVerificationCodeId", reflect.TypeOf((*MockAuthRepositoryInputPort)(nil).UpdateVerificationCodeByVerificationCodeId), ctx, verificationCode)
+}

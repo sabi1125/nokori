@@ -171,3 +171,50 @@ func (interactor *AuthInteractor) VerifyCode(ctx context.Context, verificationRe
 
 	return
 }
+
+func (interactor *AuthInteractor) ResendVerificationCode(ctx context.Context, email string) (err error) {
+	logger.Info("AuthInteractor: ResendVerificationCode")
+
+	user, err := interactor.userRepository.FindUserByEmail(ctx, email)
+	if err != nil {
+		return
+	}
+
+	if user.Email == "" {
+		return new(apperror.EmailNotRegistered)
+	}
+
+	if user.Verified {
+		return new(apperror.UserAlreadyExists)
+	}
+
+	verificationCode, err := interactor.authRepository.GetVerifiationCodeByEmail(ctx, user.UserID)
+	if err != nil {
+		return
+	}
+
+	// TODO: parallel requests for the same user can all read the old expires_at
+	// before any of them saves the new one, so each sends an email. the frontend
+	// disables the resend button to prevent it (see decisions.md, verification-limits).
+	// fix later by locking the row (SELECT ... FOR UPDATE) inside a transaction.
+	if verificationCode.ExpiresAt.After(interactor.timeProvider.Now()) {
+		return new(apperror.ResendTooSoon)
+	}
+
+	resendId, newVerificationCode, err := interactor.sendVerificationMailRepository.SendEmailWithVerificationCode(email)
+	if err != nil {
+		return
+	}
+
+	verificationCode.Code = newVerificationCode
+	verificationCode.ExpiresAt = interactor.timeProvider.Now().Add(verificationCodeLifetime)
+	verificationCode.Attempts = 0
+	verificationCode.ResendEmailId = resendId
+
+	err = interactor.authRepository.UpdateVerificationCodeByVerificationCodeId(ctx, verificationCode)
+	if err != nil {
+		return
+	}
+
+	return
+}

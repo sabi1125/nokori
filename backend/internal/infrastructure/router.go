@@ -57,4 +57,5 @@ func RegisteredAuthRouter(
 
 	auth.POST("/signup", controller.SignUp)
 	auth.POST("/verify", controller.Verify)
+	auth.POST("/resend", controller.Resend)
 }

@@ -11,3 +11,7 @@ type VerificationRequest struct {
 	Email            string `json:"email" validate:"required,max=255,email"`
 	VerificationCode string `json:"verification_code" validate:"required,min=6,max=6,number"`
 }
+
+type ResendCodeRequest struct {
+	Email string `json:"email" validate:"required,max=255,email"`
+}

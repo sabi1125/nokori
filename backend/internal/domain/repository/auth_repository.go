@@ -62,3 +62,20 @@ func (repository *AuthRepository) UpdateVerificationCodeAttempts(ctx context.Con
 	}
 	return
 }
+
+func (repository *AuthRepository) UpdateVerificationCodeByVerificationCodeId(ctx context.Context, newVerificationCode entities.VerificationCodes) (err error) {
+	logger.Info("AuthRepository: UpdateVerificationCodeByVerificationCodeId")
+	db := tx.ExtractTx(ctx)
+	if db == nil {
+		db = repository.db
+	}
+
+	if err = db.Model(&entities.VerificationCodes{}).Where("verification_code_id = ?", newVerificationCode.VerificationCodeId).
+		Select("code", "resend_email_id", "expires_at", "attempts").
+		Updates(newVerificationCode).Error; err != nil {
+		err = apperror.Wrap(apperror.InternalError, err)
+		return
+	}
+
+	return
+}

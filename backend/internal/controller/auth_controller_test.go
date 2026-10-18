@@ -466,3 +466,134 @@ func TestAuthController_Verify(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthController_Resend(t *testing.T) {
+	tests := []struct {
+		name         string
+		body         string
+		mockSetup    func(m *interactorMock.MockAuthInteractorInputPort)
+		expectedCode string
+	}{
+		{
+			name: "success",
+			body: `{"email":"example@email.com"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "example@email.com").Return(nil)
+			},
+		},
+		{
+			name: "success when email has whitespace",
+			body: `{"email":" example@email.com "}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "example@email.com").Return(nil)
+			},
+		},
+		{
+			name:         "when email is not valid",
+			body:         `{"email":" example"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "when email is more than 255chars long",
+			body:         `{"email":"sabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabir@gmail.com"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name: "success when email is 255chars long",
+			body: `{"email":"sabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabir@gmail.com"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "sabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabirsabir@gmail.com").Return(nil)
+			},
+			expectedCode: "",
+		},
+		{
+			name: "when ResendVerificationCode returns internal error",
+			body: `{"email":"example@email.com"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "example@email.com").Return(apperror.Wrap(apperror.InternalError, errors.New("internal_error")))
+			},
+			expectedCode: apperror.InternalError.Code,
+		},
+		{
+			name: "when email is not a registered email",
+			body: `{"email":"example@email.com"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "example@email.com").Return(new(apperror.EmailNotRegistered))
+			},
+			expectedCode: apperror.EmailNotRegistered.Code,
+		},
+		{
+			name: "when user for the email address already exists and is already a valid user",
+			body: `{"email":"example@email.com"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "example@email.com").Return(new(apperror.UserAlreadyExists))
+			},
+			expectedCode: apperror.UserAlreadyExists.Code,
+		},
+		{
+			name: "when resend code request is too soon and previous code is still valid",
+			body: `{"email":"example@email.com"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "example@email.com").Return(new(apperror.ResendTooSoon))
+			},
+			expectedCode: apperror.ResendTooSoon.Code,
+		},
+		{
+			name: "when sending the verification email fails",
+			body: `{"email":"example@email.com"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "example@email.com").Return(new(apperror.ServiceUnavailable))
+			},
+			expectedCode: apperror.ServiceUnavailable.Code,
+		},
+		{
+			name: "success with email trimmed and lowercased",
+			body: `{"email":" Example@EMAIL.com "}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().ResendVerificationCode(gomock.Any(), "example@email.com").Return(nil)
+			},
+		},
+		{
+			name:         "fail when email is missing",
+			body:         `{}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when body is malformed json",
+			body:         `{"email":`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAuthInteractor := interactorMock.NewMockAuthInteractorInputPort(ctrl)
+			tt.mockSetup(mockAuthInteractor)
+
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodPost, "/auth/resend", strings.NewReader(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			controller := NewAuthController(mockAuthInteractor)
+
+			err := controller.Resend(c)
+
+			if tt.expectedCode == "" {
+				assert.NoError(t, err)
+			} else {
+				appErr, ok := errors.AsType[*apperror.AppError](err)
+				assert.True(t, ok)
+				assert.Equal(t, tt.expectedCode, appErr.Code)
+			}
+		})
+	}
+}
