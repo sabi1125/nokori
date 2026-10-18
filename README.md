@@ -54,8 +54,8 @@ cd backend
 cp .env.example .env   # fill in DB credentials matching your local MySQL
 go run ./cmd/backend
 ```
-Currently exposes `GET /health` only — real endpoints land as the
-backend tickets in GitHub Issues close.
+Exposes the auth endpoints (`/auth/signup`, `/auth/verify`,
+`/auth/resend`) — see `open-api/` for the full contract.
 
 **Frontend**:
 ```

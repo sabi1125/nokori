@@ -26,17 +26,7 @@ func Router(e *echo.Echo, db *gorm.DB) {
 	timeProvider := util.NewTimeProvider()
 	uuidGenerator := util.NewUUIDGenerator()
 
-	RegisteredHealthRouter(e, db)
 	RegisteredAuthRouter(e, db, userRepository, resendConfig, uuidGenerator, timeProvider, txManager)
-}
-
-func RegisteredHealthRouter(e *echo.Echo, db *gorm.DB) {
-	health := e.Group("/health")
-	repository := repository.NewHealthRepository(db)
-	interactor := interactor.NewHealthInteractor(repository)
-	controller := controller.NewHealthController(interactor)
-
-	health.GET("", controller.Health)
 }
 
 func RegisteredAuthRouter(

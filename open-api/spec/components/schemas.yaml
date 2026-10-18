@@ -10,11 +10,3 @@ Error:
     message:
       type: string
       example: Database is unreachable.
-
-HealthResponse:
-  type: object
-  required: [status]
-  properties:
-    status:
-      type: string
-      example: ok
