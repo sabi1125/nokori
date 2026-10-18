@@ -20,6 +20,7 @@ signup:
 
     operationId: signup
     tags: [Account]
+    security: []
     requestBody:
       description: Parameters required to create user account.
       required: true
@@ -95,6 +96,7 @@ verify:
       
     operationId: verify
     tags: [Account]
+    security: []
     requestBody:
       description: Parameters required to verify user email.
       required: true
@@ -173,6 +175,7 @@ resend:
 
     operationId: resend
     tags: [Account]
+    security: []
     requestBody:
       description: Parameters required to resend verification code.
       required: true
