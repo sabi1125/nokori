@@ -48,7 +48,9 @@ rather than guessing:
 - `frontend/` — **exists** (Flutter skeleton only). Built and run via
   Xcode, no Dockerfile.
 - `docs/` — PRD, DDD, decisions.md, and diagrams (ER, state, etc.) — can
-  be split into subfolders for cleanliness as it grows.
+  be split into subfolders for cleanliness as it grows. UI designs are
+  **not** stored here: they live in one Claude Design artifact, linked
+  from docs/decisions.md ("UI designs: one Claude Design artifact").
 - Root `docker-compose.yml` — `open-api` (port **3000**),
   `open-api-bundler` (dev watcher), `mysql` (3306), `backend` (8080).
   Add services here rather than a separate compose file per service.
@@ -99,7 +101,8 @@ same reasoning as not pre-creating empty nested `CLAUDE.md` files below.
   `[Epic]` → `[Docs]` design ticket → the `[Impl]` tickets that build on
   that design. Backend work sits under a `[Docs] API spec: …` ticket
   (done when the contract is in `openapi.yaml`); frontend work sits under
-  a `[Docs] UI design: …` ticket (done when the sketch is in `docs/ui/`).
+  a `[Docs] UI design: …` ticket (done when its screens are in the
+  Claude Design artifact linked from docs/decisions.md).
   Every `[Impl]` ticket has a `[Docs]` parent. To move an existing child
   to a new parent, add `-F replace_parent=true` to the sub_issues call.
 - Work outside any PRD feature (setup, tooling, docs upkeep) goes under
