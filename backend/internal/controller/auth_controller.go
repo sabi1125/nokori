@@ -81,3 +81,27 @@ func (controller *AuthController) Verify(c echo.Context) (err error) {
 
 	return c.NoContent(http.StatusOK)
 }
+
+func (controller *AuthController) Resend(c echo.Context) (err error) {
+	logger.Info("AuthController: Resend")
+
+	ctx := c.Request().Context()
+
+	var resendCodeRequestParam entities.ResendCodeRequest
+	if err := c.Bind(&resendCodeRequestParam); err != nil {
+		return apperror.Wrap(apperror.InvalidParameter, err)
+	}
+
+	resendCodeRequestParam.Email = strings.ToLower(strings.TrimSpace(resendCodeRequestParam.Email))
+
+	if err := validator.ValidateStruct(resendCodeRequestParam); err != nil {
+		return apperror.Wrap(apperror.InvalidParameter, err)
+	}
+
+	err = controller.authInteractor.ResendVerificationCode(ctx, resendCodeRequestParam.Email)
+	if err != nil {
+		return
+	}
+
+	return c.NoContent(http.StatusOK)
+}

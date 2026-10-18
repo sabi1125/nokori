@@ -41,6 +41,20 @@ func (m *MockAuthInteractorInputPort) EXPECT() *MockAuthInteractorInputPortMockR
 	return m.recorder
 }
 
+// ResendVerificationCode mocks base method.
+func (m *MockAuthInteractorInputPort) ResendVerificationCode(ctx context.Context, email string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResendVerificationCode", ctx, email)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResendVerificationCode indicates an expected call of ResendVerificationCode.
+func (mr *MockAuthInteractorInputPortMockRecorder) ResendVerificationCode(ctx, email any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResendVerificationCode", reflect.TypeOf((*MockAuthInteractorInputPort)(nil).ResendVerificationCode), ctx, email)
+}
+
 // SignUp mocks base method.
 func (m *MockAuthInteractorInputPort) SignUp(ctx context.Context, signupParams entities.SignUp) error {
 	m.ctrl.T.Helper()
