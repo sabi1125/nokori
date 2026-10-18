@@ -87,7 +87,7 @@ verify:
         * If email address exist and if the email is verified return with 409(user_already_exists).
         * If email address exists and it is not verified get the verification code that exists for the email address.
       * From the record received from the above check if the verification code is still usable.
-        * If the code has expired (60 seconds), return with 401(token_already_expired).
+        * If the code has expired (10 minutes), return with 401(token_already_expired).
         * If the code has already been tried 5 times, return with 429(too_many_attempts).
         * Otherwise compare the given verification code to the verification code stored for that user.
           * If it does not match, count the attempt and return with 400(invalid_verification_code).
