@@ -46,6 +46,7 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-10-08 | [Email sender domain](#email-sender-domain) | Send from `noreply@nokori.dailycodingcompanion.quest` (subdomain of the existing DCC domain), permanently — no separate Nokori domain | Decided |
 | 2026-10-13 | [Verification code: attempt limit and resend limit](#verification-limits) | 5 wrong attempts invalidate a code (new `attempts` column); resend at most once per 60 seconds per user | Decided |
 | 2026-10-18 | [CI pipelines](#ci-pipelines) | GitHub Actions on PRs to `main`: backend build/vet/tests + coverage, OpenAPI lint + bundle, migrations up/down — each path-filtered; Go linter, Docker builds, Flutter, deploy deferred | Decided |
+| 2026-10-19 | [UI designs: one Claude Design artifact](#ui-designs) | All screens live in one Claude Design prototype, linked from here; no images or sketches in the repo | Decided |
 
 ---
 
@@ -1221,3 +1222,41 @@ validator, fully exercised by the controller tests) showed 0%.
 - It uses `-coverpkg` over that same package list, so indirect coverage
   counts. The total was 78.7% at the time.
 - The job summary shows the per-file table plus the total.
+
+---
+
+<a id="ui-designs"></a>
+## 2026-10-19 — UI designs: one Claude Design artifact, linked, not stored
+
+**Status:** Decided. Replaces "the sketch is saved under `docs/ui/`" as
+the done-when of every `[Docs] UI design` ticket.
+
+**Design:** https://claude.ai/artifact/5tXvnoTBDuNaSXqV8WS9Tx
+
+### Context
+
+Each `[Docs] UI design` ticket (#67, #68, #71, #73, #75, #77, #79, #81)
+was done "when the sketch is saved under `docs/ui/`". The screens were
+instead designed together, in one interactive Claude Design prototype:
+Welcome, Signup, Verify (OTP), Login, Setup, Budget, Main, AddExpense,
+Confirm, History, CycleDetail, Insights and Settings. Designing them all
+at once means the frontend work doesn't stop for design between tickets.
+
+### Options
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. PNG exports + a README in `docs/ui/` | Versioned with the code; readable without a claude.ai account. | Copies go stale the moment the design changes; someone has to re-export; images grow the repo. |
+| **B. Link to the artifact only** ✅ chosen | One source of truth, always current; interactive (states, flows, light/dark); Claude Code can read it directly when building screens. | Design changes leave no trail in git; depends on claude.ai staying reachable. |
+
+### Decision
+
+- The artifact above is the design for every screen. It is shared with
+  anyone who has the link.
+- No images, exports or sketches in the repo. `docs/ui/` is not used.
+- A `[Docs] UI design` ticket is done when its screens are in the
+  artifact. The ticket points here rather than repeating the link.
+- When the design changes in a way that affects behaviour (a new state,
+  a changed flow, a different API call), note it in the relevant ticket
+  or PR so there's still a written trail.
+
