@@ -1106,6 +1106,28 @@ hasn't expired, so the expired error said something false, and the
 client couldn't tell the two apart. `401 token_already_expired` now means
 expiry only. The client still sends the user to resend for both.
 
+**Update (2026-10-18, #85):** the resend limit is checked against
+`verification_codes.expires_at`, not `created_at`. A resend updates the
+existing row (new code, `expires_at` = now + 60 seconds, `attempts` reset
+to 0), so `created_at` keeps the signup time. Because the lifetime is
+also 60 seconds, "the code hasn't expired" means the same as "sent less
+than 60 seconds ago".
+
+The backend check is not atomic: requests that arrive while the first
+one is still sending the email all read the old `expires_at`, all pass,
+and each sends an email. Only the last saved code works. A single user
+can cause this by tapping resend repeatedly, so the client prevents it:
+
+- The resend button is disabled while a resend request is in flight.
+- After a 200, it stays disabled for a 60-second countdown, matching
+  the backend limit, so the user never hits `429 resend_too_soon`.
+- After an error (e.g. 503), it is re-enabled so the user can retry.
+
+Scripted or parallel requests from outside the app can still get past
+the limit. That's accepted for now and left as a TODO in
+`ResendVerificationCode`. The fix, if needed, is to lock the row
+(`SELECT ... FOR UPDATE`) inside a transaction.
+
 ### Rationale
 
 Five attempts plus the resend limit caps a guesser at 5 guesses a

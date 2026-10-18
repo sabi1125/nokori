@@ -193,6 +193,10 @@ func (interactor *AuthInteractor) ResendVerificationCode(ctx context.Context, em
 		return
 	}
 
+	// TODO: parallel requests for the same user can all read the old expires_at
+	// before any of them saves the new one, so each sends an email. the frontend
+	// disables the resend button to prevent it (see decisions.md, verification-limits).
+	// fix later by locking the row (SELECT ... FOR UPDATE) inside a transaction.
 	if verificationCode.ExpiresAt.After(interactor.timeProvider.Now()) {
 		return new(apperror.ResendTooSoon)
 	}
