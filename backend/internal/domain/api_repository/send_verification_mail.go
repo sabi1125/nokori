@@ -23,7 +23,8 @@ func NewSendVerificationMailRepository(resendConfig *config.ResendConfig) *SendV
 	}
 }
 
-const verificationCodeLifetime = time.Minute
+// keep in sync with verificationCodeLifetime in interactor/auth_interactor.go
+const verificationCodeLifetime = 10 * time.Minute
 
 func (repository *SendVerificationMailRepository) SendEmailWithVerificationCode(email string) (resendSendEmailId string, verificationCode string, err error) {
 	logger.Info("SendVerificationMailRepository: SendEmailWithVerificationCode")

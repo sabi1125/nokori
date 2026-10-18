@@ -43,7 +43,12 @@ func NewAuthInteractor(
 	}
 }
 
-const verificationCodeLifetime = time.Minute
+const (
+	verificationCodeLifetime = 10 * time.Minute
+	// a new code can be requested this long after the last one was sent,
+	// even if that code is still valid
+	resendCooldown = time.Minute
+)
 
 func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entities.SignUp) (err error) {
 	logger.Info("AuthInteractor: SignUp")
@@ -193,11 +198,14 @@ func (interactor *AuthInteractor) ResendVerificationCode(ctx context.Context, em
 		return
 	}
 
+	// the code was sent lifetime before it expires
+	sentAt := verificationCode.ExpiresAt.Add(-verificationCodeLifetime)
+
 	// TODO: parallel requests for the same user can all read the old expires_at
 	// before any of them saves the new one, so each sends an email. the frontend
 	// disables the resend button to prevent it (see decisions.md, verification-limits).
 	// fix later by locking the row (SELECT ... FOR UPDATE) inside a transaction.
-	if verificationCode.ExpiresAt.After(interactor.timeProvider.Now()) {
+	if interactor.timeProvider.Now().Before(sentAt.Add(resendCooldown)) {
 		return new(apperror.ResendTooSoon)
 	}
 

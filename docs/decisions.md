@@ -1129,6 +1129,21 @@ the limit. That's accepted for now and left as a TODO in
 `ResendVerificationCode`. The fix, if needed, is to lock the row
 (`SELECT ... FOR UPDATE`) inside a transaction.
 
+**Update (2026-10-18, #97):** codes now live **10 minutes** instead of
+60 seconds, so a user has time to switch apps, find the email, or wait
+for a slow delivery. The resend limit stays at once per 60 seconds but
+is no longer tied to the lifetime: the send time is worked out as
+`expires_at - 10 minutes`, and resend is allowed 60 seconds after it,
+even while the old code is still valid. Otherwise resend would be
+blocked for the full 10 minutes, including for a user who hit
+`too_many_attempts` and was told to request a new code. No migration
+needed. The client's 60-second resend countdown is unchanged.
+
+Guessing stays capped: 5 attempts per code and one new code per minute
+is still at most 5 guesses a minute per account. The lifetime constant
+exists twice (the interactor and the email sender, which prints it in
+the email) and both must change together.
+
 ### Rationale
 
 Five attempts plus the resend limit caps a guesser at 5 guesses a

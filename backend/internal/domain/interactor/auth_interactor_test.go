@@ -496,6 +496,8 @@ func TestAuthInteractor_ResendVerificationCode(t *testing.T) {
 	testNewResendId := "c5fd626d-4b1d-4092-a651-e367174a8edd"
 	testFixedTime := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	testNewVerificationCode := "121245"
+	// testVerificationCode below expires at testFixedTime, so it was sent lifetime earlier
+	testSentAt := testFixedTime.Add(-verificationCodeLifetime)
 
 	testNewUser := entities.Users{
 		UserID:       testUserId,
@@ -576,6 +578,51 @@ func TestAuthInteractor_ResendVerificationCode(t *testing.T) {
 				mTime.EXPECT().Now().Return(testFixedTime.Add(20 * -time.Minute))
 			},
 			wantedError: apperror.ResendTooSoon.Code,
+		},
+		{
+			name: "when resend is one second before the cooldown ends",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testNewUser.Email).Return(testNewUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testNewUser.UserID).Return(testVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testSentAt.Add(resendCooldown - time.Second))
+			},
+			wantedError: apperror.ResendTooSoon.Code,
+		},
+		{
+			name: "success when the cooldown has just ended",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testNewUser.Email).Return(testNewUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testNewUser.UserID).Return(testVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testSentAt.Add(resendCooldown))
+				msve.EXPECT().SendEmailWithVerificationCode(testNewUser.Email).Return(testNewResendId, testNewVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testSentAt.Add(resendCooldown))
+				mar.EXPECT().UpdateVerificationCodeByVerificationCodeId(ctx, entities.VerificationCodes{
+					VerificationCodeId: testVerificationCode.VerificationCodeId,
+					UserId:             testVerificationCode.UserId,
+					Code:               testNewVerificationCode,
+					ResendEmailId:      testNewResendId,
+					Attempts:           0,
+					ExpiresAt:          testSentAt.Add(resendCooldown).Add(verificationCodeLifetime),
+				}).Return(nil)
+			},
+		},
+		{
+			name: "success while the old code is still valid",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(ctx, testNewUser.Email).Return(testNewUser, nil)
+				mar.EXPECT().GetVerifiationCodeByEmail(ctx, testNewUser.UserID).Return(testVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testSentAt.Add(5 * time.Minute))
+				msve.EXPECT().SendEmailWithVerificationCode(testNewUser.Email).Return(testNewResendId, testNewVerificationCode, nil)
+				mTime.EXPECT().Now().Return(testSentAt.Add(5 * time.Minute))
+				mar.EXPECT().UpdateVerificationCodeByVerificationCodeId(ctx, entities.VerificationCodes{
+					VerificationCodeId: testVerificationCode.VerificationCodeId,
+					UserId:             testVerificationCode.UserId,
+					Code:               testNewVerificationCode,
+					ResendEmailId:      testNewResendId,
+					Attempts:           0,
+					ExpiresAt:          testSentAt.Add(5 * time.Minute).Add(verificationCodeLifetime),
+				}).Return(nil)
+			},
 		},
 		{
 			name: "when getting the verification code fails",
