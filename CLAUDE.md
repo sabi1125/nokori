@@ -20,8 +20,8 @@ rather than guessing:
   documentation, spec-first" and "OpenAPI spec: split by epic").
   - `spec/` — **the files you edit.** `openapi.yaml` is the table of
     contents: every URL listed, each `$ref`-ing a short descriptive key
-    in `paths/<epic>.yaml` (`paths/system.yaml` for non-epic endpoints
-    like `/health`). Reused pieces live in `components/schemas.yaml`
+    in `paths/<epic>.yaml` (`paths/system.yaml` for non-epic endpoints,
+    created when the first one is needed). Reused pieces live in `components/schemas.yaml`
     (data shapes, incl. the shared `Error`),
     `components/responses.yaml` (whole error responses) and
     `components/examples.yaml` (single example bodies, for when one

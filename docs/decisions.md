@@ -45,6 +45,7 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-10-04 | [Signup: repeat signups, cleanup, account enumeration](#signup-repeat) | Existing email → 409 with `email_not_verified` or `user_already_exists`, never overwritten; one valid code per user; unverified accounts deleted after 7 days; no deep link; rare edge cases accepted | Decided |
 | 2026-10-08 | [Email sender domain](#email-sender-domain) | Send from `noreply@nokori.dailycodingcompanion.quest` (subdomain of the existing DCC domain), permanently — no separate Nokori domain | Decided |
 | 2026-10-13 | [Verification code: attempt limit and resend limit](#verification-limits) | 5 wrong attempts invalidate a code (new `attempts` column); resend at most once per 60 seconds per user | Decided |
+| 2026-10-18 | [CI pipelines](#ci-pipelines) | GitHub Actions on PRs to `main`: backend build/vet/tests + coverage, OpenAPI lint + bundle, migrations up/down — each path-filtered; Go linter, Docker builds, Flutter, deploy deferred | Decided |
 
 ---
 
@@ -1134,3 +1135,57 @@ Five attempts plus the resend limit caps a guesser at 5 guesses a
 minute per account, which makes guessing pointless while leaving room
 for typos. Tying resend to the code's lifetime keeps one rule for the
 client: wait for the timer, then resend.
+
+---
+
+<a id="ci-pipelines"></a>
+## 2026-10-18 — CI pipelines: GitHub Actions on PRs
+
+**Status:** Decided (#91). Pipelines are built in #92 (backend), #93
+(OpenAPI) and #94 (migrations).
+
+### Context
+
+Nothing runs automatically yet. Tests, the spec bundle and migrations
+are only checked when someone remembers to run them locally, and the
+backend now has enough tests (signup, verify, resend) that a PR should
+prove they still pass before it merges.
+
+### Options
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. GitHub Actions** ✅ chosen | Lives next to the code and tickets, no extra account, free minutes cover a personal project. | Tied to GitHub. |
+| B. Another CI service (CircleCI, etc.) | Nothing over A for this project. | One more account and config to maintain. |
+
+### Decision
+
+Three workflows, each running on pull requests to `main` and limited to
+its own folder with `paths:` filters, so a docs-only PR runs nothing:
+
+| Workflow | Runs when changed | Does |
+|---|---|---|
+| Backend | `backend/**` | `go build ./...`, `go vet ./...`, `go test ./...` with a coverage report (excluding `/mock/` and `cmd/`) |
+| OpenAPI | `open-api/spec/**` | Redocly lint + bundle |
+| Migrations | `backend/migrations/**` | Start a throwaway MySQL, run all migrations up → down → up |
+
+- **Tests and coverage are one job.** `go test -cover` gives both in one
+  run; two jobs would run the suite twice.
+- **Coverage is reported, not enforced.** No minimum yet — add one once
+  the number has settled.
+- **OpenAPI runs both lint and bundle.** Lint catches wrong keywords
+  (which Scalar silently ignores); the bundle catches broken `$ref`s.
+- **Migrations are checked even though compose runs `migrate up`.**
+  Compose only runs up, only on an already-migrated local DB, and only
+  when someone starts it. CI also exercises the down migrations and a
+  fresh database, which matters once migrations run against production.
+
+**Deferred:** Go linter (golangci-lint), Docker image builds, Flutter
+(see [Frontend build/distribution](#frontend-build)), and deploy.
+
+### Rationale
+
+These three cover what has actually broken so far (stale mocks failing
+the build, broken `$ref`s in the spec) plus the one failure that would
+be hardest to undo (a bad migration on production), with as little
+setup as possible.

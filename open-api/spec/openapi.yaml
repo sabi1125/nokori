@@ -12,16 +12,12 @@ servers:
   - url: http://localhost:8080
     description: Local development
 tags:
-  - name: System
-    description: Ops endpoints outside any PRD feature.
   - name: Account
     description: Everything related to Accounts.
 
 # Table of contents: every URL is listed here, its details live in
 # paths/<epic>.yaml under a short descriptive key.
 paths:
-  /health:
-    $ref: './paths/system.yaml#/health'
   /auth/signup:
     $ref: './paths/account.yaml#/signup'
   /auth/verify:
