@@ -24,3 +24,23 @@ paths:
     $ref: './paths/account.yaml#/verify'
   /auth/resend:
     $ref: './paths/account.yaml#/resend'
+  /auth/login:
+    $ref: './paths/account.yaml#/login'
+  /auth/logout:
+    $ref: './paths/account.yaml#/logout'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Session token returned by login (see docs/decisions.md "Login sessions: opaque tokens, not JWT").
+        * Send it in every request to a protected endpoint as `Authorization: Bearer <token>`.
+          * If the token is missing, invalid or expired returns with 401(unauthorized).
+          * The app then deletes the token and goes to the login screen.
+        * The token is valid for 30 days and is extended to 30 days again while it is being used.
+          * If the app is not used for 30 days the user has to log in again.
+        * Once a day the token is replaced with a new one.
+          * The new token is returned in the `X-New-Token` response header. The app replaces the stored token with it.
+          * The old token keeps working for 5 minutes, so requests already sent with it still succeed.

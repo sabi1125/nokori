@@ -213,3 +213,127 @@ resend:
         $ref: '../components/responses.yaml#/ServiceUnavailable'
       '500':
         $ref: '../components/responses.yaml#/InternalError'
+login:
+  post:
+    summary: Login
+    description: |
+      Logs in a verified user and creates a session.
+      * Takes email, password.
+        * white spaces will be trimmed except for password.
+        * email address will be changed to lowercase.
+      * Check if valid email, password.
+        * If any of the above is invalid returns with status code 400.
+      * Check if user exists with email address and the password matches.
+        * If the email address does not exist or the password does not match returns with 401(invalid_credentials).
+          Both cases return the same response, so it does not tell which email addresses are registered.
+      * If the user exists and is not verified yet.
+        * Returns with status code 409(email_not_verified).
+      * Create a session token and save it.
+        * The token expires in 30 days and is extended while it is being used (see bearerAuth).
+        * Each login creates a new token, so each device has its own.
+      * Return 200 with the token, its expiry and the user's information.
+        * The user's information is for display only. Requests are identified by the token, never by user_id.
+
+    operationId: login
+    tags: [Account]
+    security: []
+    requestBody:
+      description: Parameters required to log in.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+              - password
+            properties:
+              email:
+                type: string
+                format: email
+                maxLength: 255
+                example: john@doe.com
+              password:
+                type: string
+                minLength: 8
+                maxLength: 72
+                format: password
+                example: password
+    responses:
+      '200':
+        description: Logged in.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, expires_at, user]
+              properties:
+                token:
+                  type: string
+                  description: 'Session token. Send it as `Authorization: Bearer <token>`.'
+                  example: x7Gk2vQp9LmN4rT8wYz1aBcDeFgHiJkLmNoPqRsTuVw
+                expires_at:
+                  type: string
+                  format: date-time
+                  example: '2026-11-20T10:00:00Z'
+                user:
+                  type: object
+                  required: [user_id, first_name, last_name, email]
+                  properties:
+                    user_id:
+                      type: string
+                      example: f79a7721-f7a4-441c-9136-a4db768c9bc3
+                    first_name:
+                      type: string
+                      example: john
+                    last_name:
+                      type: string
+                      example: doe
+                    email:
+                      type: string
+                      format: email
+                      example: john@doe.com
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        description: Email address or password is incorrect.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Error'
+            example:
+              code: invalid_credentials
+              message: Email address or password is incorrect.
+      '409':
+        description: Email registered but not verified yet.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Error'
+            examples:
+              UnverifiedEmail:
+                $ref: '../components/examples.yaml#/UnverifiedEmail'
+      '500':
+        $ref: '../components/responses.yaml#/InternalError'
+logout:
+  post:
+    summary: Logout
+    description: |
+      Ends the current session.
+      * Takes the session token from the Authorization header.
+        * If the token is missing, invalid or expired returns with 401(unauthorized).
+      * Delete the session for the token.
+        * The token stops working immediately. Other devices stay logged in.
+      * Return 200(Success).
+
+    operationId: logout
+    tags: [Account]
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        description: Logged out.
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '500':
+        $ref: '../components/responses.yaml#/InternalError'
