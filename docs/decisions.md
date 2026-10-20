@@ -47,6 +47,7 @@ this document — the PRD/DDD already say *what* we're doing.
 | 2026-10-13 | [Verification code: attempt limit and resend limit](#verification-limits) | 5 wrong attempts invalidate a code (new `attempts` column); resend at most once per 60 seconds per user | Decided |
 | 2026-10-18 | [CI pipelines](#ci-pipelines) | GitHub Actions on PRs to `main`: backend build/vet/tests + coverage, OpenAPI lint + bundle, migrations up/down — each path-filtered; Go linter, Docker builds, Flutter, deploy deferred | Decided |
 | 2026-10-19 | [UI designs: one Claude Design artifact](#ui-designs) | All screens live in one Claude Design prototype, linked from here; no images or sketches in the repo | Decided |
+| 2026-10-20 | [Login sessions: opaque tokens](#login-sessions) | Random opaque token per login, only its SHA-256 stored in `sessions`; sliding 30-day expiry; daily rotation with a 5-minute grace period; all handled in the auth middleware. Not JWT | Decided |
 
 ---
 
@@ -1259,4 +1260,137 @@ at once means the frontend work doesn't stop for design between tickets.
 - When the design changes in a way that affects behaviour (a new state,
   a changed flow, a different API call), note it in the relevant ticket
   or PR so there's still a written trail.
+
+---
+
+<a id="login-sessions"></a>
+## 2026-10-20 — Login sessions: opaque tokens, not JWT
+
+**Status:** Decided (#62). Built in #11 (login, logout, sessions table)
+and #12 (auth middleware).
+
+### Context
+
+After login, every request has to prove which user it comes from. Nokori
+holds a person's salary, spending and budget, so one user must never be
+able to read or change another's data, and a lost or stolen login has to
+be stoppable. There is one backend and one MySQL database.
+
+### Options
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. JWT (signed JSON carrying the user's info) | Checked with a signature, no DB lookup per request. Works across many services that don't share a database. | **Holds the user's information** (user ID, name, email…) in a payload anyone can decode — it's signed, not encrypted. **Can't be revoked:** valid until it expires whatever happens on the server, so logout, delete account and password change don't stop it. Its contents go stale after a profile change. Making it safe needs short-lived tokens + refresh tokens stored in the DB + a logout blocklist, which brings the DB lookup back with more moving parts. |
+| **B. Opaque token** ✅ chosen | **Holds no information** — 32 random bytes, only a key to a server-side row, so there is nothing to read or tamper with. Revoked instantly by deleting the row. One table, one indexed lookup. | One DB lookup per request (sub-millisecond on a unique index, and requests query the DB anyway). |
+
+**Why B for an application like ours:** the token is the only thing that
+identifies the user, so it should carry nothing and be killable at once.
+A finance app needs logout, delete account and "log out other devices"
+to take effect immediately, and a stolen token must not stay usable for
+weeks. JWT's one real advantage — no per-request lookup — only matters
+for many services without a shared database, which Nokori isn't.
+
+### Decision
+
+**Token**
+- Created on every login: 32 bytes from `crypto/rand`, base64url (43
+  characters). Each login and each device gets its own token.
+- The token goes to the app once, in the login response, and the app
+  keeps it in the iOS Keychain.
+- Only `SHA-256(token)` is stored. SHA-256 is one-way, so the stored
+  value can't be turned back into a token; a database leak exposes no
+  usable tokens. bcrypt isn't needed: it exists to slow guessing of weak
+  passwords, while a 32-byte random token can't be guessed (2²⁵⁶
+  possibilities), and bcrypt's salt would make lookup by hash
+  impossible.
+
+**`sessions` table** (new migration): `session_id`, `user_id` (FK →
+`users`, `ON DELETE CASCADE`), `token_hash` (unique), `previous_token_hash`,
+`previous_valid_until`, `expires_at`, `created_at`.
+
+**Requests**
+- Every protected request sends `Authorization: Bearer <token>`. Request
+  bodies never carry a `user_id`.
+- The backend **never accepts a user ID from the client**: the user
+  always comes from the session. Every query on user-owned data filters
+  by that `user_id`, and a record owned by someone else returns `404`.
+
+**Auth middleware** — all token logic lives here, so handlers only see a
+`user_id` in the request context:
+1. No `Authorization` header → `401`.
+2. Hash the token and look it up: a match on `token_hash`, or on
+   `previous_token_hash` while `previous_valid_until > now`, and
+   `expires_at > now`. Otherwise → `401`.
+3. If `expires_at < now + 29 days` (at least a day since the last
+   rotation), rotate: new token, `previous_token_hash` = old hash,
+   `previous_valid_until` = now + 5 minutes, `expires_at` = now + 30
+   days. The new token goes back in the `X-New-Token` response header. Rotation is a
+   single `UPDATE ... WHERE token_hash = <old>`, so two requests can't
+   both rotate.
+4. Put `user_id` in the context and run the handler.
+
+**Expiry and rotation**
+- **Sliding 30 days:** using the app pushes expiry forward, so a regular
+  user never has to log in again; 30 days without opening the app means
+  logging in again.
+- **Daily rotation** limits a stolen token to about a day.
+- **5-minute grace period** keeps requests already in flight with the old
+  token working. Validity is decided by `previous_valid_until` on the row,
+  never by a cleanup job, so cleanup timing can't break requests; the
+  next rotation simply overwrites the previous token.
+
+**Endpoints**
+- `POST /auth/login`: email + password → token, `expires_at` and the
+  user's info (for display only, never used to identify the user).
+  Unknown email and wrong password return the same `401
+  invalid_credentials`; an unverified account returns `409
+  email_not_verified`, the same code signup uses to send the app to the
+  OTP screen.
+- `POST /auth/logout`: deletes the current session.
+
+**App side:** the API client adds the `Authorization` header to every
+request, swaps in a rotated token from the response header, and on `401`
+deletes the token and goes to Login.
+
+**Also decided, built later:** re-enter the password for delete account,
+change email/password and CSV export; changing the password deletes all
+other sessions. Expired sessions are removed by the periodic cleanup
+(#87).
+
+```mermaid
+sequenceDiagram
+    participant App as iOS app
+    participant API as Backend
+    participant DB as MySQL
+
+    App->>API: POST /auth/login (email, password)
+    API->>DB: check user + password
+    API->>DB: insert session (SHA-256 of token, expires_at = now + 30d)
+    API-->>App: 200 { token, expires_at, user }
+    Note over App: store token in Keychain
+
+    App->>API: any request<br/>Authorization: Bearer token
+    API->>DB: middleware: find session by SHA-256 of token
+    alt no valid session
+        API-->>App: 401 → app goes to Login
+    else expires_at < now + 29d
+        API->>DB: rotate token, keep old one 5 min, expires_at = now + 30d
+        API-->>App: 200 data + new token in header
+    else valid
+        API-->>App: 200 data
+    end
+
+    App->>API: POST /auth/logout (Bearer token)
+    API->>DB: delete session
+    API-->>App: 200 — token stops working
+```
+
+### Rationale
+
+The opaque token keeps the security simple to reason about: the token
+means nothing on its own, the server is the only source of truth, and
+deleting a row ends a login. Sliding expiry keeps daily users logged in,
+rotation and the grace period limit what a stolen token can do without
+logging people out by accident, and keeping every token rule in one
+middleware means no endpoint can forget them.
 

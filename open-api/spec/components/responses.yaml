@@ -50,3 +50,13 @@ EmailNotRegistered:
       examples:
         EmailNotRegistered:
           $ref: './examples.yaml#/EmailNotRegistered'
+
+Unauthorized:
+  description: Session token is missing, invalid or expired.
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/Error'
+      example:
+        code: unauthorized
+        message: Login is required.
