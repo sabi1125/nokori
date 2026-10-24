@@ -273,7 +273,7 @@ login:
                 token:
                   type: string
                   description: 'Session token. Send it as `Authorization: Bearer <token>`.'
-                  example: x7Gk2vQp9LmN4rT8wYz1aBcDeFgHiJkLmNoPqRsTuVw
+                  example: example-session-token
                 expires_at:
                   type: string
                   format: date-time

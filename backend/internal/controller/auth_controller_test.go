@@ -601,7 +601,7 @@ func TestAuthController_Resend(t *testing.T) {
 
 func TestAuthController_Login(t *testing.T) {
 	testResponse := entities.LoginResponse{
-		Token:     "x7Gk2vQp9LmN4rT8wYz1aBcDeFgHiJkLmNoPqRsTuVw",
+		Token:     "test-session-token",
 		ExpiresAt: time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC),
 		User: entities.LoginUser{
 			UserId:    "f79a7721-f7a4-441c-9136-a4db768c9bc3",
@@ -729,7 +729,7 @@ func TestAuthController_Login(t *testing.T) {
 				assert.Equal(t, http.StatusOK, rec.Code)
 				// the body must match the spec's field names
 				assert.JSONEq(t, `{
-					"token": "x7Gk2vQp9LmN4rT8wYz1aBcDeFgHiJkLmNoPqRsTuVw",
+					"token": "test-session-token",
 					"expires_at": "2026-11-21T12:00:00Z",
 					"user": {
 						"user_id": "f79a7721-f7a4-441c-9136-a4db768c9bc3",

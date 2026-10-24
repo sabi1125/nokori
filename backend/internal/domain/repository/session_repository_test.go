@@ -18,7 +18,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 	testSession := entities.Sessions{
 		SessionId: "0f8b2c6e-3d1a-4b7e-9c2f-5a6d7e8f9a0b",
 		UserId:    "f79a7721-f7a4-441c-9136-a4db768c9bc3",
-		TokenHash: "9f2c4e1b7a3d5f6e8c0b2a4d6f8e0c2b4a6d8f0e2c4b6a8d0f2e4c6b8a0d2f4e",
+		TokenHash: "test-token-hash",
 		ExpiresAt: time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC),
 	}
 
