@@ -52,7 +52,7 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 		FirstName:    "sabir",
 		LastName:     "barahi",
 		Email:        "example@gmail.com",
-		PasswordHash: "",
+		PasswordHash: "testPasswordHash",
 		Verified:     false,
 	}
 	testVerifiedUser := entities.Users{
@@ -72,6 +72,7 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 		Verified:     false,
 	}
 
+	testPasswordHash := "testPasswordHash"
 	testVerificationCode := "testVerificationCode"
 	fixedNow := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 
@@ -81,6 +82,7 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 			mar *inputportMock.MockAuthRepositoryInputPort,
 			mur *inputportMock.MockUserRepositoryInputPort,
 			msve *apiInputportMock.MockSendVerificationMailInputPort,
+			mHasher *utilMock.MockPasswordHasher,
 			mUUID *utilMock.MockUUIDGenerator,
 			mTime *utilMock.MockTimeProvider,
 		)
@@ -92,24 +94,17 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
 				mur.EXPECT().FindUserByEmail(ctx, testSignupParam.Email).Return(entities.Users{}, nil)
 				mUUID.EXPECT().NewV7().Return(testUserId, nil)
+				mHasher.EXPECT().Hash(testSignupParam.Password).Return(testPasswordHash, nil)
 				mUUID.EXPECT().NewV7().Return(testVerificationCodeId, nil)
 				msve.EXPECT().SendEmailWithVerificationCode(testSignupParam.Email).Return(testResendId, testVerificationCode, nil)
 				mTime.EXPECT().Now().Return(fixedNow)
-				mur.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, user entities.Users) error {
-						err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash),
-							[]byte(testSignupParam.Password))
-						assert.NoError(t, err)
-
-						user.PasswordHash = ""
-						assert.Equal(t, testNewUser, user)
-						return nil
-					})
+				mur.EXPECT().CreateUser(gomock.Any(), testNewUser).Return(nil)
 				mar.EXPECT().InsertVerificationCode(ctx, entities.VerificationCodes{
 					VerificationCodeId: testVerificationCodeId,
 					UserId:             testUserId,
@@ -126,6 +121,7 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
@@ -139,6 +135,7 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
@@ -148,16 +145,34 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 			wantedError: apperror.InternalError.Code,
 		},
 		{
-			name: "when verification code id generation fails",
+			name: "when password hashing fails",
 			prepareFunc: func(
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
 				mur.EXPECT().FindUserByEmail(ctx, testSignupParam.Email).Return(entities.Users{}, nil)
 				mUUID.EXPECT().NewV7().Return(testUserId, nil)
+				mHasher.EXPECT().Hash(testSignupParam.Password).Return("", errors.New("hashing failed"))
+			},
+			wantedError: apperror.InternalError.Code,
+		},
+		{
+			name: "when verification code id generation fails",
+			prepareFunc: func(
+				mar *inputportMock.MockAuthRepositoryInputPort,
+				mur *inputportMock.MockUserRepositoryInputPort,
+				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
+				mUUID *utilMock.MockUUIDGenerator,
+				mTime *utilMock.MockTimeProvider,
+			) {
+				mur.EXPECT().FindUserByEmail(ctx, testSignupParam.Email).Return(entities.Users{}, nil)
+				mUUID.EXPECT().NewV7().Return(testUserId, nil)
+				mHasher.EXPECT().Hash(testSignupParam.Password).Return(testPasswordHash, nil)
 				mUUID.EXPECT().NewV7().Return("", apperror.Wrap(apperror.InternalError, errors.New("uuid generation error")))
 			},
 			wantedError: apperror.InternalError.Code,
@@ -168,11 +183,13 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
 				mur.EXPECT().FindUserByEmail(ctx, testSignupParam.Email).Return(entities.Users{}, nil)
 				mUUID.EXPECT().NewV7().Return(testUserId, nil)
+				mHasher.EXPECT().Hash(testSignupParam.Password).Return(testPasswordHash, nil)
 				mUUID.EXPECT().NewV7().Return(testVerificationCodeId, nil)
 				msve.EXPECT().SendEmailWithVerificationCode(testSignupParam.Email).Return("", "", apperror.Wrap(apperror.InternalError, errors.New("failed to create verification code")))
 			},
@@ -184,11 +201,13 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
 				mur.EXPECT().FindUserByEmail(ctx, testSignupParam.Email).Return(entities.Users{}, nil)
 				mUUID.EXPECT().NewV7().Return(testUserId, nil)
+				mHasher.EXPECT().Hash(testSignupParam.Password).Return(testPasswordHash, nil)
 				mUUID.EXPECT().NewV7().Return(testVerificationCodeId, nil)
 				msve.EXPECT().SendEmailWithVerificationCode(testSignupParam.Email).Return("", "", apperror.Wrap(apperror.InternalError, errors.New("failed to create verification code")))
 			},
@@ -200,11 +219,13 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
 				mur.EXPECT().FindUserByEmail(ctx, testSignupParam.Email).Return(entities.Users{}, nil)
 				mUUID.EXPECT().NewV7().Return(testUserId, nil)
+				mHasher.EXPECT().Hash(testSignupParam.Password).Return(testPasswordHash, nil)
 				mUUID.EXPECT().NewV7().Return(testVerificationCodeId, nil)
 				msve.EXPECT().SendEmailWithVerificationCode(testSignupParam.Email).Return("", "", apperror.Wrap(apperror.ServiceUnavailable, errors.New("failed to send verification email")))
 			},
@@ -216,11 +237,13 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
 				mur.EXPECT().FindUserByEmail(ctx, testSignupParam.Email).Return(entities.Users{}, nil)
 				mUUID.EXPECT().NewV7().Return(testUserId, nil)
+				mHasher.EXPECT().Hash(testSignupParam.Password).Return(testPasswordHash, nil)
 				mUUID.EXPECT().NewV7().Return(testVerificationCodeId, nil)
 				msve.EXPECT().SendEmailWithVerificationCode(testSignupParam.Email).Return(testResendId, testVerificationCode, nil)
 				mTime.EXPECT().Now().Return(fixedNow)
@@ -234,24 +257,17 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
 				mur.EXPECT().FindUserByEmail(ctx, testSignupParam.Email).Return(entities.Users{}, nil)
 				mUUID.EXPECT().NewV7().Return(testUserId, nil)
+				mHasher.EXPECT().Hash(testSignupParam.Password).Return(testPasswordHash, nil)
 				mUUID.EXPECT().NewV7().Return(testVerificationCodeId, nil)
 				msve.EXPECT().SendEmailWithVerificationCode(testSignupParam.Email).Return(testResendId, testVerificationCode, nil)
 				mTime.EXPECT().Now().Return(fixedNow)
-				mur.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, user entities.Users) error {
-						err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash),
-							[]byte(testSignupParam.Password))
-						assert.NoError(t, err)
-
-						user.PasswordHash = ""
-						assert.Equal(t, testNewUser, user)
-						return nil
-					})
+				mur.EXPECT().CreateUser(gomock.Any(), testNewUser).Return(nil)
 				mar.EXPECT().InsertVerificationCode(ctx, entities.VerificationCodes{
 					VerificationCodeId: testVerificationCodeId,
 					UserId:             testUserId,
@@ -268,6 +284,7 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
@@ -281,6 +298,7 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 				mar *inputportMock.MockAuthRepositoryInputPort,
 				mur *inputportMock.MockUserRepositoryInputPort,
 				msve *apiInputportMock.MockSendVerificationMailInputPort,
+				mHasher *utilMock.MockPasswordHasher,
 				mUUID *utilMock.MockUUIDGenerator,
 				mTime *utilMock.MockTimeProvider,
 			) {
@@ -300,12 +318,15 @@ func TestAuthInteractor_SignUp(t *testing.T) {
 			mockSendVerificationMailRepository := apiInputportMock.NewMockSendVerificationMailInputPort(ctrl)
 			mockUUID := utilMock.NewMockUUIDGenerator(ctrl)
 			mockTimeProvider := utilMock.NewMockTimeProvider(ctrl)
+			mockPasswordHasher := utilMock.NewMockPasswordHasher(ctrl)
+			mockTokenGenerator := utilMock.NewMockTokenGenerator(ctrl)
+			mockSessionRepository := inputportMock.NewMockSessionRepositoryInputPort(ctrl)
 			mockTx := txMock.NewMockManager(ctrl)
 			mockWithinTransaction(mockTx)
 
-			tt.prepareFunc(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockUUID, mockTimeProvider)
+			tt.prepareFunc(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockPasswordHasher, mockUUID, mockTimeProvider)
 
-			interactor := NewAuthInteractor(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockUUID, mockTimeProvider, mockTx)
+			interactor := NewAuthInteractor(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockSessionRepository, mockPasswordHasher, mockTokenGenerator, mockUUID, mockTimeProvider, mockTx)
 
 			err := interactor.SignUp(ctx, testSignupParam)
 
@@ -467,12 +488,15 @@ func TestAuthInteractor_VerifyCode(t *testing.T) {
 			mockSendVerificationMailRepository := apiInputportMock.NewMockSendVerificationMailInputPort(ctrl)
 			mockUUID := utilMock.NewMockUUIDGenerator(ctrl)
 			mockTimeProvider := utilMock.NewMockTimeProvider(ctrl)
+			mockPasswordHasher := utilMock.NewMockPasswordHasher(ctrl)
+			mockTokenGenerator := utilMock.NewMockTokenGenerator(ctrl)
+			mockSessionRepository := inputportMock.NewMockSessionRepositoryInputPort(ctrl)
 			mockTx := txMock.NewMockManager(ctrl)
 			mockWithinTransaction(mockTx)
 
 			tt.prepareFunc(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockUUID, mockTimeProvider)
 
-			interactor := NewAuthInteractor(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockUUID, mockTimeProvider, mockTx)
+			interactor := NewAuthInteractor(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockSessionRepository, mockPasswordHasher, mockTokenGenerator, mockUUID, mockTimeProvider, mockTx)
 
 			err := interactor.VerifyCode(ctx, testVerificationRequest)
 
@@ -666,12 +690,15 @@ func TestAuthInteractor_ResendVerificationCode(t *testing.T) {
 			mockSendVerificationMailRepository := apiInputportMock.NewMockSendVerificationMailInputPort(ctrl)
 			mockUUID := utilMock.NewMockUUIDGenerator(ctrl)
 			mockTimeProvider := utilMock.NewMockTimeProvider(ctrl)
+			mockPasswordHasher := utilMock.NewMockPasswordHasher(ctrl)
+			mockTokenGenerator := utilMock.NewMockTokenGenerator(ctrl)
+			mockSessionRepository := inputportMock.NewMockSessionRepositoryInputPort(ctrl)
 			mockTx := txMock.NewMockManager(ctrl)
 			mockWithinTransaction(mockTx)
 
 			tt.prepareFunc(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockUUID, mockTimeProvider)
 
-			interactor := NewAuthInteractor(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockUUID, mockTimeProvider, mockTx)
+			interactor := NewAuthInteractor(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockSessionRepository, mockPasswordHasher, mockTokenGenerator, mockUUID, mockTimeProvider, mockTx)
 
 			err := interactor.ResendVerificationCode(ctx, testNewUser.Email)
 
@@ -682,6 +709,192 @@ func TestAuthInteractor_ResendVerificationCode(t *testing.T) {
 				assert.True(t, ok)
 				assert.Equal(t, tt.wantedError, appErr.Code)
 			}
+		})
+	}
+}
+
+func TestAuthInteractor_Login(t *testing.T) {
+	ctx := context.Background()
+
+	testToken := "testToken"
+	testExpiresAt := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	testUserId := "d1271cfd-c311-428a-9a90-03f16c3a23c7"
+	testFirstName := "testFirstName"
+	testLastName := "testLastName"
+	testEmailAddress := "example@email.com"
+	testPassword := "testpassword12345"
+
+	testLoginParameter := entities.LoginParameter{
+		Email:    testEmailAddress,
+		Password: testPassword,
+	}
+
+	hash, _ := bcrypt.GenerateFromPassword([]byte(testLoginParameter.Password), bcrypt.MinCost)
+	testPasswordHash := string(hash)
+	testHashedToken := "testToken"
+
+	testLoginUser := entities.LoginUser{
+		UserId:    testUserId,
+		FirstName: testFirstName,
+		LastName:  testLastName,
+		Email:     testEmailAddress,
+	}
+
+	testLoginResponse := entities.LoginResponse{
+		Token:     testToken,
+		ExpiresAt: testExpiresAt.Add(720 * time.Hour),
+		User:      testLoginUser,
+	}
+
+	testUser := entities.Users{
+		UserID:       testUserId,
+		FirstName:    testFirstName,
+		LastName:     testLastName,
+		Email:        testEmailAddress,
+		PasswordHash: testPasswordHash,
+		Verified:     true,
+	}
+
+	testSessionId := "acfdef27-4b7c-4714-87e9-afb4940748da"
+
+	testSession := entities.Sessions{
+		SessionId: testSessionId,
+		UserId:    testUserId,
+		TokenHash: testHashedToken,
+		ExpiresAt: testExpiresAt.Add(720 * time.Hour),
+	}
+
+	tests := []struct {
+		name        string
+		prepareFunc func(
+			mar *inputportMock.MockAuthRepositoryInputPort,
+			mur *inputportMock.MockUserRepositoryInputPort,
+			msr *inputportMock.MockSessionRepositoryInputPort,
+			msve *apiInputportMock.MockSendVerificationMailInputPort,
+			mph *utilMock.MockPasswordHasher,
+			mtg *utilMock.MockTokenGenerator,
+			mUUID *utilMock.MockUUIDGenerator,
+			mTime *utilMock.MockTimeProvider,
+		)
+		wantedLoginResponse entities.LoginResponse
+		wantedError         string
+	}{
+		{
+			name: "success",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(testUser, nil)
+				mph.EXPECT().Compare(testUser.PasswordHash, testLoginParameter.Password).Return(nil)
+				mtg.EXPECT().GenerateToken().Return(testToken, testHashedToken, nil)
+				mUUID.EXPECT().NewV7().Return(testSessionId, nil)
+				mTime.EXPECT().Now().Return(testExpiresAt)
+				msr.EXPECT().CreateSession(gomock.Any(), testSession).Return(nil)
+			},
+			wantedLoginResponse: testLoginResponse,
+			wantedError:         "",
+		},
+		{
+			name: "when user is not found",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(entities.Users{}, nil)
+			},
+			wantedLoginResponse: entities.LoginResponse{},
+			wantedError:         apperror.InvalidCredentials.Code,
+		},
+		{
+			name: "when user is not verified",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(entities.Users{
+					Email:    testEmailAddress,
+					Verified: false,
+				}, nil)
+			},
+			wantedLoginResponse: entities.LoginResponse{},
+			wantedError:         apperror.EmailNotVerified.Code,
+		},
+		{
+			name: "when invalid password",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(testUser, nil)
+				mph.EXPECT().Compare(testUser.PasswordHash, testLoginParameter.Password).Return(errors.New("invalid password"))
+			},
+			wantedLoginResponse: entities.LoginResponse{},
+			wantedError:         apperror.InvalidCredentials.Code,
+		},
+		{
+			name: "when finding the user fails",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(entities.Users{}, apperror.Wrap(apperror.InternalError, errors.New("db error")))
+			},
+			wantedLoginResponse: entities.LoginResponse{},
+			wantedError:         apperror.InternalError.Code,
+		},
+		{
+			name: "when generating the token fails",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(testUser, nil)
+				mph.EXPECT().Compare(testUser.PasswordHash, testLoginParameter.Password).Return(nil)
+				mtg.EXPECT().GenerateToken().Return("", "", apperror.Wrap(apperror.InternalError, errors.New("rand error")))
+			},
+			wantedLoginResponse: entities.LoginResponse{},
+			wantedError:         apperror.InternalError.Code,
+		},
+		{
+			name: "when generating the session id fails",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(testUser, nil)
+				mph.EXPECT().Compare(testUser.PasswordHash, testLoginParameter.Password).Return(nil)
+				mtg.EXPECT().GenerateToken().Return(testToken, testHashedToken, nil)
+				mUUID.EXPECT().NewV7().Return("", errors.New("uuid error"))
+			},
+			wantedLoginResponse: entities.LoginResponse{},
+			wantedError:         apperror.InternalError.Code,
+		},
+		{
+			name: "when creating the session fails",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(testUser, nil)
+				mph.EXPECT().Compare(testUser.PasswordHash, testLoginParameter.Password).Return(nil)
+				mtg.EXPECT().GenerateToken().Return(testToken, testHashedToken, nil)
+				mUUID.EXPECT().NewV7().Return(testSessionId, nil)
+				mTime.EXPECT().Now().Return(testExpiresAt)
+				msr.EXPECT().CreateSession(gomock.Any(), testSession).Return(apperror.Wrap(apperror.InternalError, errors.New("db error")))
+			},
+			wantedLoginResponse: entities.LoginResponse{},
+			wantedError:         apperror.InternalError.Code,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAuthRepository := inputportMock.NewMockAuthRepositoryInputPort(ctrl)
+			mockUserRepository := inputportMock.NewMockUserRepositoryInputPort(ctrl)
+			mockSendVerificationMailRepository := apiInputportMock.NewMockSendVerificationMailInputPort(ctrl)
+			mockUUID := utilMock.NewMockUUIDGenerator(ctrl)
+			mockTimeProvider := utilMock.NewMockTimeProvider(ctrl)
+			mockPasswordHasher := utilMock.NewMockPasswordHasher(ctrl)
+			mockTokenGenerator := utilMock.NewMockTokenGenerator(ctrl)
+			mockSessionRepository := inputportMock.NewMockSessionRepositoryInputPort(ctrl)
+			mockTx := txMock.NewMockManager(ctrl)
+			mockWithinTransaction(mockTx)
+
+			tt.prepareFunc(mockAuthRepository, mockUserRepository, mockSessionRepository, mockSendVerificationMailRepository, mockPasswordHasher, mockTokenGenerator, mockUUID, mockTimeProvider)
+
+			interactor := NewAuthInteractor(mockAuthRepository, mockUserRepository, mockSendVerificationMailRepository, mockSessionRepository, mockPasswordHasher, mockTokenGenerator, mockUUID, mockTimeProvider, mockTx)
+
+			loginResponse, err := interactor.Login(ctx, testLoginParameter)
+
+			if tt.wantedError == "" {
+				assert.NoError(t, err)
+			} else {
+				appErr, ok := errors.AsType[*apperror.AppError](err)
+				assert.True(t, ok)
+				assert.Equal(t, tt.wantedError, appErr.Code)
+			}
+
+			assert.Equal(t, tt.wantedLoginResponse, loginResponse)
 		})
 	}
 }

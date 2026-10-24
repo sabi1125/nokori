@@ -4,6 +4,7 @@
 erDiagram
     USER ||--o| SETTINGS : has
     USER ||--o{ VERIFICATION_CODE : has
+    USER ||--o{ SESSION : has
     USER ||--o{ BUDGET_CYCLE : has
     BUDGET_CYCLE ||--o{ EXPENSES_HISTORY : has
     BUDGET_CYCLE ||--o{ MONTHLY_ANALYSIS : has
@@ -25,6 +26,17 @@ erDiagram
         string user_id FK
         string code
         string resend_email_id
+        datetime expires_at
+        int attempts
+        datetime created_at
+    }
+
+    SESSION {
+        string session_id PK
+        string user_id FK
+        string token_hash UK
+        string previous_token_hash UK
+        datetime previous_valid_until
         datetime expires_at
         datetime created_at
     }
@@ -88,9 +100,19 @@ erDiagram
   "Basic needs: ship a default set, not a fixed list").
 - `VERIFICATION_CODE` rows are deleted by app logic on use or expiry —
   no `used` flag needed (see decisions.md "Email verification").
-- `VERIFICATION_CODE.resend_email_id` is nullable: the row is inserted
-  in the signup transaction, before the email is sent, and the ID Resend
-  returns is filled in afterwards.
+- `VERIFICATION_CODE.resend_email_id` is the ID Resend returns for the
+  email that carried the code. The email is sent first and the row is
+  saved with the ID already set (signup inserts it; resend overwrites it
+  with the new email's ID). The column is nullable only because it was
+  added to an existing table, so rows from before that migration have
+  none.
+- `SESSION` is one row per logged-in device. Only the SHA-256 of the
+  session token is stored (`token_hash`, 64 hex characters), never the
+  token itself. `previous_token_hash` / `previous_valid_until` keep the
+  token from before the last daily rotation working for 5 minutes; both
+  are `NULL` until the first rotation. Deleting a user deletes their
+  sessions (`ON DELETE CASCADE`). See decisions.md "Login sessions:
+  opaque tokens, not JWT".
 - `BUDGET_CYCLE.basic_needs` is JSON: a variable, user-editable list of
   `{name, amount}` items, not a fixed set of columns.
 - `MONTHLY_ANALYSIS` has no cap-counter column: capped at 1/cycle, so

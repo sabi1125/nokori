@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"backend/internal/domain/apperror"
 	"backend/internal/domain/entities"
@@ -589,6 +590,154 @@ func TestAuthController_Resend(t *testing.T) {
 
 			if tt.expectedCode == "" {
 				assert.NoError(t, err)
+			} else {
+				appErr, ok := errors.AsType[*apperror.AppError](err)
+				assert.True(t, ok)
+				assert.Equal(t, tt.expectedCode, appErr.Code)
+			}
+		})
+	}
+}
+
+func TestAuthController_Login(t *testing.T) {
+	testResponse := entities.LoginResponse{
+		Token:     "x7Gk2vQp9LmN4rT8wYz1aBcDeFgHiJkLmNoPqRsTuVw",
+		ExpiresAt: time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC),
+		User: entities.LoginUser{
+			UserId:    "f79a7721-f7a4-441c-9136-a4db768c9bc3",
+			FirstName: "sabir",
+			LastName:  "barahi",
+			Email:     "example@email.com",
+		},
+	}
+	validParams := entities.LoginParameter{Email: "example@email.com", Password: "password123"}
+
+	tests := []struct {
+		name         string
+		body         string
+		mockSetup    func(m *interactorMock.MockAuthInteractorInputPort)
+		expectedCode string
+	}{
+		{
+			name: "success",
+			body: `{"email":"example@email.com","password":"password123"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().Login(gomock.Any(), validParams).Return(testResponse, nil)
+			},
+		},
+		{
+			name: "success with email trimmed and lowercased",
+			body: `{"email":" Example@EMAIL.com ","password":"password123"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().Login(gomock.Any(), validParams).Return(testResponse, nil)
+			},
+		},
+		{
+			name:         "fail when email is not valid",
+			body:         `{"email":"example","password":"password123"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when email is longer than 255chars",
+			body:         `{"email":"` + strings.Repeat("sabir", 50) + `@gmail.com","password":"password123"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when email is missing",
+			body:         `{"password":"password123"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when password is missing",
+			body:         `{"email":"example@email.com"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when password is shorter than 8",
+			body:         `{"email":"example@email.com","password":"pass123"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when password is longer than 72",
+			body:         `{"email":"example@email.com","password":"` + strings.Repeat("a", 73) + `"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when password is not ASCII",
+			body:         `{"email":"example@email.com","password":"のこりpassword"}`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name:         "fail when body is malformed json",
+			body:         `{"email":`,
+			mockSetup:    func(m *interactorMock.MockAuthInteractorInputPort) {},
+			expectedCode: apperror.InvalidParameter.Code,
+		},
+		{
+			name: "fail when credentials are invalid",
+			body: `{"email":"example@email.com","password":"password123"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().Login(gomock.Any(), validParams).Return(entities.LoginResponse{}, new(apperror.InvalidCredentials))
+			},
+			expectedCode: apperror.InvalidCredentials.Code,
+		},
+		{
+			name: "fail when email is not verified",
+			body: `{"email":"example@email.com","password":"password123"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().Login(gomock.Any(), validParams).Return(entities.LoginResponse{}, new(apperror.EmailNotVerified))
+			},
+			expectedCode: apperror.EmailNotVerified.Code,
+		},
+		{
+			name: "fail with internal error",
+			body: `{"email":"example@email.com","password":"password123"}`,
+			mockSetup: func(m *interactorMock.MockAuthInteractorInputPort) {
+				m.EXPECT().Login(gomock.Any(), validParams).Return(entities.LoginResponse{}, apperror.Wrap(apperror.InternalError, errors.New("internal_error")))
+			},
+			expectedCode: apperror.InternalError.Code,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAuthInteractor := interactorMock.NewMockAuthInteractorInputPort(ctrl)
+			tt.mockSetup(mockAuthInteractor)
+
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			controller := NewAuthController(mockAuthInteractor)
+
+			err := controller.Login(c)
+
+			if tt.expectedCode == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, rec.Code)
+				// the body must match the spec's field names
+				assert.JSONEq(t, `{
+					"token": "x7Gk2vQp9LmN4rT8wYz1aBcDeFgHiJkLmNoPqRsTuVw",
+					"expires_at": "2026-11-21T12:00:00Z",
+					"user": {
+						"user_id": "f79a7721-f7a4-441c-9136-a4db768c9bc3",
+						"first_name": "sabir",
+						"last_name": "barahi",
+						"email": "example@email.com"
+					}
+				}`, rec.Body.String())
 			} else {
 				appErr, ok := errors.AsType[*apperror.AppError](err)
 				assert.True(t, ok)

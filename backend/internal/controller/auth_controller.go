@@ -105,3 +105,27 @@ func (controller *AuthController) Resend(c echo.Context) (err error) {
 
 	return c.NoContent(http.StatusOK)
 }
+
+func (controller *AuthController) Login(c echo.Context) (err error) {
+	logger.Info("AuthController: Login")
+
+	ctx := c.Request().Context()
+
+	var loginParameter entities.LoginParameter
+	if err := c.Bind(&loginParameter); err != nil {
+		return apperror.Wrap(apperror.InvalidParameter, err)
+	}
+
+	loginParameter.Email = strings.ToLower(strings.TrimSpace(loginParameter.Email))
+
+	if err := validator.ValidateStruct(loginParameter); err != nil {
+		return apperror.Wrap(apperror.InvalidParameter, err)
+	}
+
+	res, err := controller.authInteractor.Login(ctx, loginParameter)
+	if err != nil {
+		return
+	}
+
+	return c.JSON(http.StatusOK, res)
+}

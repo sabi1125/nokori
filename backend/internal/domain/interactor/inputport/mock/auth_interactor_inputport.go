@@ -41,6 +41,21 @@ func (m *MockAuthInteractorInputPort) EXPECT() *MockAuthInteractorInputPortMockR
 	return m.recorder
 }
 
+// Login mocks base method.
+func (m *MockAuthInteractorInputPort) Login(ctx context.Context, loginParameter entities.LoginParameter) (entities.LoginResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Login", ctx, loginParameter)
+	ret0, _ := ret[0].(entities.LoginResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Login indicates an expected call of Login.
+func (mr *MockAuthInteractorInputPortMockRecorder) Login(ctx, loginParameter any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockAuthInteractorInputPort)(nil).Login), ctx, loginParameter)
+}
+
 // ResendVerificationCode mocks base method.
 func (m *MockAuthInteractorInputPort) ResendVerificationCode(ctx context.Context, email string) error {
 	m.ctrl.T.Helper()

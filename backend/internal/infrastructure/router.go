@@ -25,8 +25,10 @@ func Router(e *echo.Echo, db *gorm.DB) {
 	// utils
 	timeProvider := util.NewTimeProvider()
 	uuidGenerator := util.NewUUIDGenerator()
+	passwordHasher := util.NewPasswordHasher()
+	tokenGenerator := util.NewTokenGenerator()
 
-	RegisteredAuthRouter(e, db, userRepository, resendConfig, uuidGenerator, timeProvider, txManager)
+	RegisteredAuthRouter(e, db, userRepository, resendConfig, passwordHasher, tokenGenerator, uuidGenerator, timeProvider, txManager)
 }
 
 func RegisteredAuthRouter(
@@ -34,18 +36,22 @@ func RegisteredAuthRouter(
 	db *gorm.DB,
 	userRepository *repository.UserRepository,
 	resendConfig *config.ResendConfig,
+	passwordHasher util.PasswordHasher,
+	tokenGenerator util.TokenGenerator,
 	uuidGenerator util.UUIDGenerator,
 	timeProvider util.TimeProvider,
 	txManager tx.Manager,
 ) {
 	auth := e.Group("/auth")
 
+	sessionRepository := repository.NewSessionRepository(db)
 	repository := repository.NewAuthRepository(db)
 	apiRepository := apirepository.NewSendVerificationMailRepository(resendConfig)
-	interactor := interactor.NewAuthInteractor(repository, userRepository, apiRepository, uuidGenerator, timeProvider, txManager)
+	interactor := interactor.NewAuthInteractor(repository, userRepository, apiRepository, sessionRepository, passwordHasher, tokenGenerator, uuidGenerator, timeProvider, txManager)
 	controller := controller.NewAuthController(interactor)
 
 	auth.POST("/signup", controller.SignUp)
 	auth.POST("/verify", controller.Verify)
 	auth.POST("/resend", controller.Resend)
+	auth.POST("/login", controller.Login)
 }
