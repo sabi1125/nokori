@@ -2,11 +2,8 @@ package interactor
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/base64"
-	"encoding/hex"
+	"errors"
 	"time"
 
 	api_inputport "backend/internal/domain/api_repository/inputport"
@@ -59,6 +56,8 @@ const (
 	// a new code can be requested this long after the last one was sent,
 	// even if that code is still valid
 	resendCooldown = time.Minute
+	// a session lasts this long and is extended by this much while it is used
+	sessionLifetime = 30 * 24 * time.Hour
 )
 
 func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entities.SignUp) (err error) {
@@ -257,8 +256,12 @@ func (interactor *AuthInteractor) Login(ctx context.Context, loginParameter enti
 	}
 
 	err = interactor.passwordHasher.Compare(user.PasswordHash, loginParameter.Password)
-	if err != nil {
+	if errors.Is(err, util.ErrPasswordMismatch) {
 		err = new(apperror.InvalidCredentials)
+		return
+	}
+	if err != nil {
+		err = apperror.Wrap(apperror.InternalError, err)
 		return
 	}
 
@@ -272,13 +275,13 @@ func (interactor *AuthInteractor) Login(ctx context.Context, loginParameter enti
 		err = apperror.Wrap(apperror.InternalError, err)
 		return
 	}
-	sessionLifeTime := interactor.timeProvider.Now().Add(720 * time.Hour)
+	sessionExpiresAt := interactor.timeProvider.Now().Add(sessionLifetime)
 
 	session := entities.Sessions{
 		SessionId: sessionId,
 		UserId:    user.UserID,
-		TokenHash: string(hash[:]),
-		ExpiresAt: sessionLifeTime,
+		TokenHash: hash,
+		ExpiresAt: sessionExpiresAt,
 	}
 
 	err = interactor.sessionRepository.CreateSession(ctx, session)
@@ -288,7 +291,7 @@ func (interactor *AuthInteractor) Login(ctx context.Context, loginParameter enti
 
 	loginResponse = entities.LoginResponse{
 		Token:     token,
-		ExpiresAt: sessionLifeTime,
+		ExpiresAt: sessionExpiresAt,
 		User: entities.LoginUser{
 			UserId:    user.UserID,
 			FirstName: user.FirstName,
@@ -296,21 +299,6 @@ func (interactor *AuthInteractor) Login(ctx context.Context, loginParameter enti
 			Email:     user.Email,
 		},
 	}
-
-	return
-}
-
-func generateToken() (token string, tokenHash string, err error) {
-	bytes := make([]byte, 32)
-
-	if _, err = rand.Read(bytes); err != nil {
-		err = apperror.Wrap(apperror.InternalError, err)
-		return
-	}
-
-	token = base64.RawURLEncoding.EncodeToString(bytes)
-	hash := sha256.Sum256([]byte(token))
-	tokenHash = hex.EncodeToString(hash[:])
 
 	return
 }

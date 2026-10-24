@@ -12,6 +12,7 @@ import (
 	inputportMock "backend/internal/domain/repository/inputport/mock"
 	logger "backend/internal/log"
 	txMock "backend/internal/tx/mock"
+	"backend/internal/util"
 	utilMock "backend/internal/util/mock"
 
 	"github.com/stretchr/testify/assert"
@@ -815,10 +816,19 @@ func TestAuthInteractor_Login(t *testing.T) {
 			name: "when invalid password",
 			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
 				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(testUser, nil)
-				mph.EXPECT().Compare(testUser.PasswordHash, testLoginParameter.Password).Return(errors.New("invalid password"))
+				mph.EXPECT().Compare(testUser.PasswordHash, testLoginParameter.Password).Return(util.ErrPasswordMismatch)
 			},
 			wantedLoginResponse: entities.LoginResponse{},
 			wantedError:         apperror.InvalidCredentials.Code,
+		},
+		{
+			name: "when the stored password hash is broken",
+			prepareFunc: func(mar *inputportMock.MockAuthRepositoryInputPort, mur *inputportMock.MockUserRepositoryInputPort, msr *inputportMock.MockSessionRepositoryInputPort, msve *apiInputportMock.MockSendVerificationMailInputPort, mph *utilMock.MockPasswordHasher, mtg *utilMock.MockTokenGenerator, mUUID *utilMock.MockUUIDGenerator, mTime *utilMock.MockTimeProvider) {
+				mur.EXPECT().FindUserByEmail(gomock.Any(), testLoginParameter.Email).Return(testUser, nil)
+				mph.EXPECT().Compare(testUser.PasswordHash, testLoginParameter.Password).Return(errors.New("hash too short"))
+			},
+			wantedLoginResponse: entities.LoginResponse{},
+			wantedError:         apperror.InternalError.Code,
 		},
 		{
 			name: "when finding the user fails",

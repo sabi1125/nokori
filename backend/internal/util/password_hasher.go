@@ -2,10 +2,16 @@
 package util
 
 import (
+	"errors"
+
 	"backend/internal/domain/apperror"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+// ErrPasswordMismatch is returned by Compare when the password is wrong.
+// Any other error from Compare means the stored hash itself is broken.
+var ErrPasswordMismatch = errors.New("password does not match")
 
 type PasswordHasher interface {
 	Hash(password string) (string, error)
@@ -28,5 +34,9 @@ func (h *passwordHasher) Hash(password string) (string, error) {
 }
 
 func (h *passwordHasher) Compare(hash string, password string) error {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		return ErrPasswordMismatch
+	}
+	return err
 }
