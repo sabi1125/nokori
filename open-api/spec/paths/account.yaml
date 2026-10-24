@@ -223,11 +223,13 @@ login:
         * email address will be changed to lowercase.
       * Check if valid email, password.
         * If any of the above is invalid returns with status code 400.
-      * Check if user exists with email address and the password matches.
-        * If the email address does not exist or the password does not match returns with 401(invalid_credentials).
-          Both cases return the same response, so it does not tell which email addresses are registered.
+      * Check if user exists with email address.
+        * If the email address does not exist returns with 401(invalid_credentials).
       * If the user exists and is not verified yet.
-        * Returns with status code 409(email_not_verified).
+        * Returns with status code 409(email_not_verified), without checking the password.
+      * Check if the password matches.
+        * If the password does not match returns with 401(invalid_credentials).
+          Same response as an unknown email address, so it does not tell which email addresses are registered.
       * Create a session token and save it.
         * The token expires in 30 days and is extended while it is being used (see bearerAuth).
         * Each login creates a new token, so each device has its own.
@@ -271,7 +273,7 @@ login:
                 token:
                   type: string
                   description: 'Session token. Send it as `Authorization: Bearer <token>`.'
-                  example: x7Gk2vQp9LmN4rT8wYz1aBcDeFgHiJkLmNoPqRsTuVw
+                  example: example-session-token
                 expires_at:
                   type: string
                   format: date-time

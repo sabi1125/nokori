@@ -11,4 +11,5 @@ type AuthInteractorInputPort interface {
 	SignUp(ctx context.Context, signupParams entities.SignUp) (err error)
 	VerifyCode(ctx context.Context, verificationRequestParams entities.VerificationRequest) (err error)
 	ResendVerificationCode(ctx context.Context, email string) (err error)
+	Login(ctx context.Context, loginParameter entities.LoginParameter) (loginResponse entities.LoginResponse, err error)
 }

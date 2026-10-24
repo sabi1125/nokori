@@ -3,6 +3,7 @@ package interactor
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"time"
 
 	api_inputport "backend/internal/domain/api_repository/inputport"
@@ -12,14 +13,15 @@ import (
 	logger "backend/internal/log"
 	"backend/internal/tx"
 	"backend/internal/util"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthInteractor struct {
 	authRepository                 inputport.AuthRepositoryInputPort
 	userRepository                 inputport.UserRepositoryInputPort
 	sendVerificationMailRepository api_inputport.SendVerificationMailInputPort
+	sessionRepository              inputport.SessionRepositoryInputPort
+	passwordHasher                 util.PasswordHasher
+	tokenGenerator                 util.TokenGenerator
 	uuidGenerator                  util.UUIDGenerator
 	timeProvider                   util.TimeProvider
 	txManager                      tx.Manager
@@ -29,6 +31,9 @@ func NewAuthInteractor(
 	authRepository inputport.AuthRepositoryInputPort,
 	userRepository inputport.UserRepositoryInputPort,
 	sendVerificationMailRepository api_inputport.SendVerificationMailInputPort,
+	sessionRepository inputport.SessionRepositoryInputPort,
+	passwordHasher util.PasswordHasher,
+	tokenGenerator util.TokenGenerator,
 	uuidGenerator util.UUIDGenerator,
 	timeProvider util.TimeProvider,
 	txManager tx.Manager,
@@ -37,6 +42,9 @@ func NewAuthInteractor(
 		authRepository:                 authRepository,
 		userRepository:                 userRepository,
 		sendVerificationMailRepository: sendVerificationMailRepository,
+		passwordHasher:                 passwordHasher,
+		tokenGenerator:                 tokenGenerator,
+		sessionRepository:              sessionRepository,
 		uuidGenerator:                  uuidGenerator,
 		timeProvider:                   timeProvider,
 		txManager:                      txManager,
@@ -48,6 +56,8 @@ const (
 	// a new code can be requested this long after the last one was sent,
 	// even if that code is still valid
 	resendCooldown = time.Minute
+	// a session lasts this long and is extended by this much while it is used
+	sessionLifetime = 30 * 24 * time.Hour
 )
 
 func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entities.SignUp) (err error) {
@@ -71,7 +81,7 @@ func (interactor *AuthInteractor) SignUp(ctx context.Context, signupParams entit
 		return apperror.Wrap(apperror.InternalError, err)
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(signupParams.Password), bcrypt.DefaultCost)
+	hashedPassword, err := interactor.passwordHasher.Hash(signupParams.Password)
 	if err != nil {
 		return apperror.Wrap(apperror.InternalError, err)
 	}
@@ -222,6 +232,72 @@ func (interactor *AuthInteractor) ResendVerificationCode(ctx context.Context, em
 	err = interactor.authRepository.UpdateVerificationCodeByVerificationCodeId(ctx, verificationCode)
 	if err != nil {
 		return
+	}
+
+	return
+}
+
+func (interactor *AuthInteractor) Login(ctx context.Context, loginParameter entities.LoginParameter) (loginResponse entities.LoginResponse, err error) {
+	logger.Info("AuthInteractor: Login")
+
+	user, err := interactor.userRepository.FindUserByEmail(ctx, loginParameter.Email)
+	if err != nil {
+		return
+	}
+
+	if user.Email == "" {
+		err = new(apperror.InvalidCredentials)
+		return
+	}
+
+	if !user.Verified {
+		err = new(apperror.EmailNotVerified)
+		return
+	}
+
+	err = interactor.passwordHasher.Compare(user.PasswordHash, loginParameter.Password)
+	if errors.Is(err, util.ErrPasswordMismatch) {
+		err = new(apperror.InvalidCredentials)
+		return
+	}
+	if err != nil {
+		err = apperror.Wrap(apperror.InternalError, err)
+		return
+	}
+
+	token, hash, err := interactor.tokenGenerator.GenerateToken()
+	if err != nil {
+		return
+	}
+
+	sessionId, err := interactor.uuidGenerator.NewV7()
+	if err != nil {
+		err = apperror.Wrap(apperror.InternalError, err)
+		return
+	}
+	sessionExpiresAt := interactor.timeProvider.Now().Add(sessionLifetime)
+
+	session := entities.Sessions{
+		SessionId: sessionId,
+		UserId:    user.UserID,
+		TokenHash: hash,
+		ExpiresAt: sessionExpiresAt,
+	}
+
+	err = interactor.sessionRepository.CreateSession(ctx, session)
+	if err != nil {
+		return
+	}
+
+	loginResponse = entities.LoginResponse{
+		Token:     token,
+		ExpiresAt: sessionExpiresAt,
+		User: entities.LoginUser{
+			UserId:    user.UserID,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			Email:     user.Email,
+		},
 	}
 
 	return
