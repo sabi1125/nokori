@@ -14,4 +14,5 @@ var (
 	TooManyAttempts         = AppError{Code: "too_many_attempts", Status: http.StatusTooManyRequests, Message: "Too many wrong attempts. Please request a new code."}
 	ResendTooSoon           = AppError{Code: "resend_too_soon", Status: http.StatusTooManyRequests, Message: "Please wait a minute before requesting a new code."}
 	InvalidCredentials      = AppError{Code: "invalid_credentials", Status: http.StatusUnauthorized, Message: "Email address or password is incorrect."}
+	Unauthorized            = AppError{Code: "unauthorized", Status: http.StatusUnauthorized, Message: "Login is required."}
 )

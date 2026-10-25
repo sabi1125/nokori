@@ -9,4 +9,6 @@ import (
 
 type SessionRepositoryInputPort interface {
 	CreateSession(ctx context.Context, session entities.Sessions) (err error)
+	GetSessionByTokenHash(ctx context.Context, tokenHash string) (session *entities.Sessions, err error)
+	DeleteSessionById(ctx context.Context, sessionId string) (err error)
 }
